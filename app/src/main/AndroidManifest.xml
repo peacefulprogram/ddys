@@ -30,6 +30,12 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".detail.DetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".playback.VideoPlaybackActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

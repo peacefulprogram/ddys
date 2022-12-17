@@ -4,4 +4,6 @@
     <dimen name="video_preview_card_height">244dp</dimen>
     <dimen name="video_card_h_gap">12dp</dimen>
     <dimen name="video_card_v_gap">17dp</dimen>
+    <dimen name="video_preview_card_width_small">113dp</dimen>
+    <dimen name="video_preview_card_height_small">163dp</dimen>
 </resources>

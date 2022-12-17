@@ -23,6 +23,7 @@ import coil.load
 import com.jing.ddys.R
 import com.jing.ddys.databinding.FragmentMainBinding
 import com.jing.ddys.databinding.VideoCardLayoutBinding
+import com.jing.ddys.detail.DetailActivity
 import com.jing.ddys.repository.VideoCardInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,6 +45,7 @@ class MainFragment : Fragment() {
     var selectCategoryIndex = 0
 
     var selectCategoryColor = 0
+
     var unselectCategoryColor = 0
 
     private lateinit var videoPagingAdapter: PagingDataAdapter<VideoCardInfo>
@@ -224,6 +226,9 @@ class MainFragment : Fragment() {
                         onCategorySelect(category.first)
                     }
                 }
+                if (requireActivity().currentFocus == null && position == selectCategoryIndex) {
+                    requestFocus()
+                }
             }
         }
 
@@ -255,6 +260,9 @@ class MainFragment : Fragment() {
         override fun onBindViewHolder(viewHolder: ViewHolder?, item: Any?) {
             val video = item as VideoCardInfo
             with(viewHolder!!.view.getTag(R.id.view_binding_tag) as VideoCardLayoutBinding) {
+                root.setOnClickListener {
+                    DetailActivity.navigateTo(requireContext(), item.url)
+                }
                 title.text = item.title
                 subTitle.text = item.subTitle ?: ""
                 if (video.imageUrl.isEmpty()) {
