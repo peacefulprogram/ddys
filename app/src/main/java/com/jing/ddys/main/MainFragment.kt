@@ -80,7 +80,7 @@ class MainFragment : Fragment() {
     private fun initVideoGrid() {
         videoBridgeAdapter = ItemBridgeAdapter()
         videoPagingAdapter =
-            PagingDataAdapter(VideoCardPresenter(requireContext()), videoCardDiff).apply {
+            PagingDataAdapter(NewVideoCardPresenter(requireContext()), videoCardDiff).apply {
                 var startRefresh = false
                 addLoadStateListener {
                     when (it.refresh) {
@@ -154,8 +154,17 @@ class MainFragment : Fragment() {
         val categoryList = listOf(
             Pair("/", "首页"),
             Pair("/category/anime/new-bangumi/", "本季新番"),
+            Pair("/category/airing/", "连载剧集"),
+            Pair("/category/movie/", "电影"),
             Pair("/category/drama/kr-drama/", "韩剧"),
-            Pair("/category/movie/", "电影")
+            Pair("/category/anime/", "动画"),
+            Pair("/category/movie/western-movie/", "欧美电影"),
+            Pair("/category/movie/asian-movie/", "日韩电影"),
+            Pair("/category/movie/chinese-movie/", "华语电影"),
+            Pair("/tag/douban-top250/", "豆瓣TOP250"),
+            Pair("/category/drama/western-drama/", "欧美剧"),
+            Pair("/category/drama/cn-drama/", "华语剧"),
+            Pair("/category/drama/jp-drama/", "日剧"),
         )
         viewBinding.categoryRow.apply {
             setNumRows(1)
@@ -251,82 +260,17 @@ class MainFragment : Fragment() {
                 if (video.imageUrl.isEmpty()) {
                     cover.setImageDrawable(mDefaultCardImage)
                 } else {
-                    cover.load(video.imageUrl)
-                }
-            }
-        }
-
-        override fun onUnbindViewHolder(viewHolder: ViewHolder?) {
-        }
-
-    }
-
-    private inner class VideoCardPresenter(
-        context: Context,
-    ) :
-        Presenter() {
-
-        val sDefaultBackgroundColor =
-            ContextCompat.getColor(context, R.color.default_background)
-        val sSelectedBackgroundColor =
-            ContextCompat.getColor(context, R.color.selected_background)
-
-        val cardWidth = context.resources.getDimension(R.dimen.video_preview_card_width).toInt()
-        val cardHeight = context.resources.getDimension(R.dimen.video_preview_card_height).toInt()
-
-        val mDefaultCardImage = ContextCompat.getColor(context, R.color.gray900).toDrawable()
-
-
-        override fun onBindViewHolder(viewHolder: ViewHolder?, item: Any?) {
-            val video = item as VideoCardInfo
-            val cardView = viewHolder?.view as ImageCardView
-
-            cardView.titleText = video.title
-            cardView.contentText = video.subTitle
-            cardView.setMainImageDimensions(
-                cardWidth,
-                cardHeight
-            )
-            if (video.imageUrl.isEmpty()) {
-                cardView.mainImageView.setImageDrawable(mDefaultCardImage)
-            } else {
-                cardView.mainImageView.load(video.imageUrl)
-            }
-        }
-
-
-        private fun updateCardBackgroundColor(view: ImageCardView, selected: Boolean) {
-            val color = if (selected) sSelectedBackgroundColor else sDefaultBackgroundColor
-            // Both background colors should be set because the view"s background is temporarily visible
-            // during animations.
-            view.setBackgroundColor(color)
-            view.setInfoAreaBackgroundColor(color)
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup?): ViewHolder {
-            val cardView =
-                object : ImageCardView(
-                    context
-                ) {
-                    override fun setSelected(selected: Boolean) {
-                        updateCardBackgroundColor(this, selected)
-                        super.setSelected(selected)
+                    cover.load(video.imageUrl) {
+                        error(mDefaultCardImage)
                     }
                 }
-
-            cardView.isFocusable = true
-            cardView.isFocusableInTouchMode = true
-            updateCardBackgroundColor(cardView, false)
-            return ViewHolder(cardView)
-        }
-
-        override fun onUnbindViewHolder(viewHolder: ViewHolder?) {
-            with(viewHolder?.view as ImageCardView) {
-                mainImage = null
-                badgeImage = null
             }
         }
 
+        override fun onUnbindViewHolder(viewHolder: ViewHolder?) {
+        }
+
     }
+
 
 }
