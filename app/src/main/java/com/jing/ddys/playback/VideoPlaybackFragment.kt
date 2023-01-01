@@ -54,7 +54,6 @@ class VideoPlaybackFragment(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.videoIndex.collectLatest {
@@ -103,7 +102,7 @@ class VideoPlaybackFragment(
         val dataSourceFactory = OkHttpDataSource.Factory {
             val req = it.newBuilder()
                 .header("user-agent", HttpUtil.USER_AGENT)
-                .header("referer", videoDetail.detailPageUrl)
+//                .header("referer", videoDetail.detailPageUrl)
                 .build()
             okHttpClient.newCall(req)
         }
@@ -179,6 +178,9 @@ class VideoPlaybackFragment(
 
     fun onKeyEvent(keyEvent: KeyEvent): Boolean {
         if (keyEvent.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (isControlsOverlayVisible) {
+                return false
+            }
             if (exoplayer?.isPlaying != true) {
                 backPressed = false
                 return false
