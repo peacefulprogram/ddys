@@ -20,5 +20,6 @@ data class VideoSeason(
 
 data class VideoEpisode(
     val id: String,
-    val name: String
+    val name: String,
+    val subTitleUrl: String
 ) : java.io.Serializable

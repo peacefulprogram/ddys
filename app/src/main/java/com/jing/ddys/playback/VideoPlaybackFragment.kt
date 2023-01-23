@@ -11,23 +11,23 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.MediaItem.SubtitleConfiguration
 import com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter
-import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSource
-import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
+import com.google.android.exoplayer2.util.MimeTypes
 import com.jing.bilibilitv.playback.GlueActionCallback
 import com.jing.bilibilitv.playback.PlayListAction
 import com.jing.bilibilitv.playback.ReplayAction
 import com.jing.ddys.ext.dpToPx
 import com.jing.ddys.ext.showLongToast
-import com.jing.ddys.repository.HttpUtil
 import com.jing.ddys.repository.Resource
 import com.jing.ddys.repository.VideoDetailInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
+
 
 class VideoPlaybackFragment(
     private val videoDetail: VideoDetailInfo,
@@ -67,9 +67,25 @@ class VideoPlaybackFragment(
                 viewModel.videoUrl.collectLatest {
                     when (it) {
                         is Resource.Success -> {
-                            val mediaItem = MediaItem.fromUri(it.data)
+                            val (_, url, _, subtitleUrl) = it.data
                             exoplayer?.apply {
-                                setMediaItem(mediaItem)
+                                val mediaItemBuilder = MediaItem.Builder()
+                                    .setUri(url)
+                                if (subtitleUrl != null) {
+                                    SubtitleConfiguration.Builder(subtitleUrl)
+                                        .setMimeType(MimeTypes.TEXT_VTT)
+                                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                                        .setLanguage("zh")
+                                        .build()
+                                        .run {
+                                            mediaItemBuilder.setSubtitleConfigurations(
+                                                listOf(
+                                                    this
+                                                )
+                                            )
+                                        }
+                                }
+                                exoplayer!!.setMediaItem(mediaItemBuilder.build())
                                 prepare()
                                 if (resumeFrom > 0) {
                                     seekTo(resumeFrom)
@@ -98,23 +114,12 @@ class VideoPlaybackFragment(
     }
 
     private fun buildPlayer() {
-        val okHttpClient = OkHttpClient()
-        val dataSourceFactory = OkHttpDataSource.Factory {
-            val req = it.newBuilder()
-                .header("user-agent", HttpUtil.USER_AGENT)
-//                .header("referer", videoDetail.detailPageUrl)
-                .build()
-            okHttpClient.newCall(req)
-        }
-        val mediaSourceFactory = DefaultMediaSourceFactory(requireContext()).apply {
-            setDataSourceFactory(dataSourceFactory)
-        }
         exoplayer = ExoPlayer.Builder(requireContext())
-            .setMediaSourceFactory(mediaSourceFactory)
             .build().apply {
                 prepareGlue(this)
                 playWhenReady = true
             }
+
     }
 
 
@@ -146,6 +151,7 @@ class VideoPlaybackFragment(
             // Enable seek manually since PlaybackTransportControlGlue.getSeekProvider() is null,
             // so that PlayerAdapter.seekTo(long) will be called during user seeking.
             isSeekEnabled = true
+            isControlsOverlayAutoHideEnabled = true
             addActionCallback(replayActionCallback)
             addActionCallback(changePlayVideoActionCallback)
             setKeyEventInterceptor { onKeyEvent(it) }

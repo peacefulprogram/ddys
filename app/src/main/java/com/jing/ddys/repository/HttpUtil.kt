@@ -1,17 +1,23 @@
 package com.jing.ddys.repository
 
+import android.net.Uri
 import com.google.gson.Gson
+import com.jing.ddys.ext.inflate
+import com.jing.ddys.ext.unGzip
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import java.util.regex.Pattern
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 object HttpUtil {
 
     const val USER_AGENT =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
-    private const val BASE_URL = "https://ddys.tv"
+    private const val BASE_URL = "https://ddys.art"
     private val gson = Gson()
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(Interceptor { chain ->
@@ -111,7 +117,10 @@ object HttpUtil {
         val episodeList = tracks.map {
             VideoEpisode(
                 id = it["src1"] as String,
-                name = it["caption"] as String
+                name = it["caption"] as String,
+                subTitleUrl = it["subsrc"]?.toString()?.let {
+                    "${BASE_URL}/subddr${it}"
+                } ?: ""
             )
         }
         return VideoDetailInfo(
@@ -127,7 +136,7 @@ object HttpUtil {
 
     }
 
-    fun queryVideoUrl(id: String, detailPageUrl: String): String {
+    fun queryVideoUrl(id: String, detailPageUrl: String): VideoUrl {
         val req = Request.Builder()
             .header("referer", detailPageUrl)
             .url("$BASE_URL/getvddr/video?id=$id&dim=1080P&type=mix")
@@ -141,12 +150,51 @@ object HttpUtil {
         }
         val url = map["url"] as String?
         if (url != null) {
-            return url
+            return VideoUrl(
+                type = VideoUrlType.URL,
+                url = Uri.parse(url)
+            )
         }
         val pin = map["pin"] as String?
         if (pin != null) {
-            throw RuntimeException("暂不支持解析pin")
+            return VideoUrl(
+                type = VideoUrlType.M3U8_TEXT,
+                m3u8Text = pin.toByteArray(Charsets.ISO_8859_1).inflate().toString(Charsets.UTF_8)
+            )
         }
         throw RuntimeException("无法识别的接口响应:$resp")
     }
+
+    fun downloadSubtitles(url: String): String {
+        val resp = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+            .let {
+                okHttpClient.newCall(it).execute()
+            }
+        if (resp.code != 200) {
+            throw RuntimeException("请求字幕出错")
+        }
+        return resp.body
+            ?.bytes()
+            ?.let {
+                decryptSubtitle(it)
+            }
+            ?.unGzip()
+            ?.toString(Charsets.UTF_8)
+            ?: throw RuntimeException("字幕响应体为空")
+    }
+
+    private fun decryptSubtitle(bytes: ByteArray): ByteArray {
+        val key = bytes.sliceArray(0 until 0x10)
+        val iv = bytes.sliceArray(0 until 0x10)
+        val keySpec = SecretKeySpec(key, "AES")
+        return Cipher.getInstance("AES/CBC/PKCS5Padding").run {
+            init(Cipher.DECRYPT_MODE, keySpec, IvParameterSpec(iv))
+            doFinal(bytes.sliceArray(0x10 until bytes.size))
+        }
+    }
+
+
 }
