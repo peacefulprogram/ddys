@@ -3,10 +3,12 @@ package com.jing.ddys.main
 import android.content.Context
 import android.graphics.Rect
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.Fragment
@@ -73,6 +75,25 @@ class MainFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.pager.collectLatest {
                 videoPagingAdapter.submitData(it)
+            }
+        }
+
+        videoPagingAdapter.addLoadStateListener {
+            when (val refreshState = it.refresh) {
+                is LoadState.Error -> {
+                    Toast.makeText(
+                        requireContext(),
+                        "请求数据错误:${refreshState.error.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    Log.e(TAG, "请求数据错误: ${refreshState.error.message}", refreshState.error)
+                }
+                is LoadState.NotLoading -> {
+                    if (videoPagingAdapter.size() == 0) {
+                        Toast.makeText(requireContext(), "未请求到数据", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                LoadState.Loading -> {}
             }
         }
 
