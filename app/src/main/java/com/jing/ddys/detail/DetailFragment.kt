@@ -13,6 +13,7 @@ import androidx.leanback.widget.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import coil.load
+import com.jing.ddys.DdysApplication
 import com.jing.ddys.R
 import com.jing.ddys.databinding.SmallVideoCardLayoutBinding
 import com.jing.ddys.databinding.VideoDetailRowBinding
@@ -132,7 +133,7 @@ class DetailFragment(private val detailPageUrl: String) : RowsSupportFragment() 
                         if (video.imageUrl.isEmpty()) {
                             cover.setImageDrawable(0.toDrawable())
                         } else {
-                            cover.load(video.imageUrl)
+                            cover.load(video.imageUrl, imageLoader = DdysApplication.imageLoader)
                         }
                         title.text = video.title
                     }
@@ -198,7 +199,7 @@ class DetailFragment(private val detailPageUrl: String) : RowsSupportFragment() 
         override fun onBindRowViewHolder(vh: ViewHolder?, item: Any?) {
             val info = item as VideoDetailInfo
             with(vh!!.view.getTag(R.id.view_binding_tag) as VideoDetailRowBinding) {
-                videoCover.load(info.coverUrl)
+                videoCover.load(info.coverUrl, imageLoader = DdysApplication.imageLoader)
                 title.text = info.title
                 description.text = info.description
                 root.requestFocus()

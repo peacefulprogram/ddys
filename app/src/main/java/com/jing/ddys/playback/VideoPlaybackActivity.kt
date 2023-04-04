@@ -3,6 +3,7 @@ package com.jing.ddys.playback
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import com.jing.ddys.R
 import com.jing.ddys.repository.VideoDetailInfo
@@ -18,6 +19,7 @@ class VideoPlaybackActivity : FragmentActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.playback_fragment, VideoPlaybackFragment(videoDetail, playEpisodeIndex))
             .commit()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     companion object {

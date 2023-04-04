@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.jing.ddys.context.GlobalContext
+import com.jing.ddys.DdysApplication
 import com.jing.ddys.repository.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +70,7 @@ class PlaybackViewModel : ViewModel() {
                         '/',
                         '-'
                     ) + videoDetail.episodes[videoIndex].name + '-' + videoIndex + ".m3u8"
-                val cacheFile = File(GlobalContext.context.cacheDir, cacheFileName)
+                val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
                 cacheFile.writeText(url.m3u8Text)
                 url = url.copy(url = cacheFile.toUri())
             }
@@ -82,7 +82,7 @@ class PlaybackViewModel : ViewModel() {
                             '/',
                             '-'
                         ) + ".vtt"
-                val cacheFile = File(GlobalContext.context.cacheDir, cacheFileName)
+                val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
                 cacheFile.writeText(subtitle)
                 url = url.copy(subtitleUrl = cacheFile.toUri())
             }

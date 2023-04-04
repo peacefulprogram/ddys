@@ -8,10 +8,15 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.regex.Pattern
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
 
 object HttpUtil {
 
@@ -19,7 +24,21 @@ object HttpUtil {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
     private const val BASE_URL = "https://ddys.art"
     private val gson = Gson()
-    private val okHttpClient = OkHttpClient.Builder()
+
+    private val trustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        }
+
+        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        }
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+
+    }
+
+    val okHttpClient = OkHttpClient.Builder()
+        .sslSocketFactory(buildSSLSocketFactory(), trustManager)
+        .hostnameVerifier { _, _ -> true }
         .addInterceptor(Interceptor { chain ->
             val originalReq = chain.request()
             val builder = originalReq
@@ -39,7 +58,7 @@ object HttpUtil {
         .build()
 
 
-    suspend fun queryVideoOfCategory(pageUrl: String, page: Int): BasePageResult<VideoCardInfo> {
+    fun queryVideoOfCategory(pageUrl: String, page: Int): BasePageResult<VideoCardInfo> {
         var finalUrl = BASE_URL + pageUrl
         if (page > 1) {
             finalUrl = "$finalUrl/page/$page/"
@@ -92,7 +111,9 @@ object HttpUtil {
         } ?: emptyList()
         val relatedVideos = document.select(".crp_related li").map { li ->
             val url = li.selectFirst("a")!!.absUrl("href")
-            val imgSrc = li.selectFirst("img")?.dataset()?.get("src") ?: ""
+            val imgSrc = li.selectFirst("img")?.let {
+                it.attr("src") ?: it.dataset()["src"]
+            } ?: ""
             val title = li.selectFirst(".crp_title")!!.text().trim()
             VideoCardInfo(
                 imageUrl = imgSrc,
@@ -103,7 +124,9 @@ object HttpUtil {
         }
         val infoArea = document.selectFirst(".doulist-subject")!!
         val title = infoArea.selectFirst(".title")!!.text().trim()
-        val cover = infoArea.selectFirst(".post img")!!.dataset()["src"]
+        val cover = infoArea.selectFirst(".post img")!!.let {
+            it.attr("src") ?: it.dataset()["src"]
+        }
         val ratingNumber = infoArea.selectFirst(".rating_nums")!!.text()
         val description = infoArea.selectFirst(".abstract")!!
             .html()
@@ -195,6 +218,12 @@ object HttpUtil {
             doFinal(bytes.sliceArray(0x10 until bytes.size))
         }
     }
+
+    private fun buildSSLSocketFactory(): SSLSocketFactory = SSLContext.getInstance("SSL")
+        .apply {
+            init(null, arrayOf(trustManager), SecureRandom())
+        }
+        .socketFactory
 
 
 }

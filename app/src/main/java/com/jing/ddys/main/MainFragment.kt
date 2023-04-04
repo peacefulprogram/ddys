@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import coil.load
+import com.jing.ddys.DdysApplication
 import com.jing.ddys.R
 import com.jing.ddys.databinding.FragmentMainBinding
 import com.jing.ddys.databinding.VideoCardLayoutBinding
@@ -289,7 +290,7 @@ class MainFragment : Fragment() {
                 if (video.imageUrl.isEmpty()) {
                     cover.setImageDrawable(mDefaultCardImage)
                 } else {
-                    cover.load(video.imageUrl) {
+                    cover.load(video.imageUrl, imageLoader = DdysApplication.imageLoader) {
                         error(mDefaultCardImage)
                     }
                 }
