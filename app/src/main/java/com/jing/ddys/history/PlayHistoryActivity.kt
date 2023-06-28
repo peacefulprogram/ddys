@@ -1,4 +1,4 @@
-package com.jing.ddys.detail
+package com.jing.ddys.history
 
 import android.content.Context
 import android.content.Intent
@@ -13,21 +13,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
-import com.jing.ddys.compose.screen.DetailScreen
+import com.jing.ddys.compose.screen.PlayHistoryScreen
 import com.jing.ddys.compose.theme.DdysTheme
 import org.koin.android.ext.android.get
-import org.koin.core.parameter.parametersOf
 
-class DetailActivity : ComponentActivity() {
+class PlayHistoryActivity : ComponentActivity() {
 
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val url = intent.getStringExtra(URL_KEY)!!
-        val viewModel = get<DetailViewModel> { parametersOf(url) }
+        val viewModel = get<PlayHistoryViewModel>()
         setContent {
             DdysTheme {
                 Box(
@@ -40,8 +37,11 @@ class DetailActivity : ComponentActivity() {
                         )
                         .fillMaxWidth()
                 ) {
-                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                        DetailScreen(viewModel = viewModel)
+                    CompositionLocalProvider(
+                        androidx.tv.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface,
+                        androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface
+                    ) {
+                        PlayHistoryScreen(viewModel = viewModel)
                     }
                 }
             }
@@ -49,10 +49,8 @@ class DetailActivity : ComponentActivity() {
     }
 
     companion object {
-        const val URL_KEY = "url"
-        fun navigateTo(context: Context, url: String) {
-            Intent(context, DetailActivity::class.java).apply {
-                putExtra(URL_KEY, url)
+        fun navigateTo(context: Context) {
+            Intent(context, PlayHistoryActivity::class.java).apply {
                 context.startActivity(this)
             }
         }

@@ -1,6 +1,7 @@
 package com.jing.ddys.playback
 
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -10,25 +11,29 @@ import androidx.leanback.app.VideoSupportFragment
 import androidx.leanback.app.VideoSupportFragmentGlueHost
 import androidx.leanback.widget.Action
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.MediaItem.SubtitleConfiguration
+import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter
 import com.google.android.exoplayer2.util.MimeTypes
 import com.jing.bilibilitv.playback.GlueActionCallback
 import com.jing.bilibilitv.playback.PlayListAction
 import com.jing.bilibilitv.playback.ReplayAction
 import com.jing.ddys.ext.dpToPx
+import com.jing.ddys.ext.secondsToDuration
 import com.jing.ddys.ext.showLongToast
+import com.jing.ddys.ext.showShortToast
 import com.jing.ddys.repository.Resource
 import com.jing.ddys.repository.VideoDetailInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.get
+import org.koin.core.parameter.parametersOf
 
 
 class VideoPlaybackFragment(
@@ -48,9 +53,7 @@ class VideoPlaybackFragment(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel = ViewModelProvider(this)[PlaybackViewModel::class.java].apply {
-            init(videoDetail, playEpIndex)
-        }
+        viewModel = get { parametersOf(videoDetail, playEpIndex) }
         isControlsOverlayAutoHideEnabled = true
     }
 
@@ -70,7 +73,8 @@ class VideoPlaybackFragment(
                 viewModel.videoUrl.collectLatest {
                     when (it) {
                         is Resource.Success -> {
-                            val (_, url, _, subtitleUrl) = it.data
+                            val history = it.data
+                            val (_, url, _, subtitleUrl) = history.url
                             exoplayer?.apply {
                                 val mediaItemBuilder = MediaItem.Builder()
                                     .setUri(url)
@@ -93,10 +97,20 @@ class VideoPlaybackFragment(
                                 if (resumeFrom > 0) {
                                     seekTo(resumeFrom)
                                     resumeFrom = -1
+                                } else if (history.lastPlayPosition > 0) {
+                                    // 距离结束小于10秒,当作播放结束
+                                    if (history.videoDuration > 0 && history.videoDuration - history.lastPlayPosition < 10_000) {
+                                        requireContext().showShortToast("上次已播放完,将从头开始播放")
+                                    } else {
+                                        val seekTo = history.lastPlayPosition
+                                        exoplayer?.seekTo(seekTo)
+                                        requireContext().showShortToast("已定位到上次播放位置:${(seekTo / 1000).secondsToDuration()}")
+                                    }
                                 }
                                 play()
                             }
                         }
+
                         is Resource.Error -> requireContext().showLongToast(it.message)
                         else -> {}
                     }
@@ -105,15 +119,34 @@ class VideoPlaybackFragment(
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT <= 23) {
+            buildPlayer()
+        }
+    }
+
     override fun onStart() {
         super.onStart()
-        buildPlayer()
+        if (Build.VERSION.SDK_INT > 23) {
+            buildPlayer()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT <= 23) {
+            resumeFrom = exoplayer!!.currentPosition
+            destroyPlayer()
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        resumeFrom = exoplayer!!.currentPosition
-        destroyPlayer()
+        if (Build.VERSION.SDK_INT > 23) {
+            resumeFrom = exoplayer!!.currentPosition
+            destroyPlayer();
+        }
     }
 
     private fun buildPlayer() {
@@ -121,6 +154,22 @@ class VideoPlaybackFragment(
             .build().apply {
                 prepareGlue(this)
                 playWhenReady = true
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == ExoPlayer.STATE_ENDED) {
+                            viewModel.playNextEpisodeIfExists()
+                        }
+                    }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        if (isPlaying) {
+                            viewModel.startSaveHistory()
+                        } else {
+                            viewModel.saveHistory()
+                            viewModel.stopSaveHistory()
+                        }
+                    }
+                })
             }
 
     }
@@ -147,7 +196,10 @@ class VideoPlaybackFragment(
                 it.add(PlayListAction(requireContext()))
                 it.add(ReplayAction(requireContext()))
             },
-            updateProgress = {}
+            updateProgress = {
+                viewModel.currentPlayPosition = localExoplayer.currentPosition
+                viewModel.videoDuration = localExoplayer.duration
+            }
         ).apply {
             host = VideoSupportFragmentGlueHost(this@VideoPlaybackFragment)
             title = videoDetail.title

@@ -6,47 +6,60 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jing.ddys.DdysApplication
-import com.jing.ddys.repository.*
-import kotlinx.coroutines.*
+import com.jing.ddys.repository.HttpUtil
+import com.jing.ddys.repository.Resource
+import com.jing.ddys.repository.VideoDetailInfo
+import com.jing.ddys.repository.VideoUrl
+import com.jing.ddys.repository.VideoUrlType
+import com.jing.ddys.room.dao.EpisodeHistoryDao
+import com.jing.ddys.room.dao.VideoHistoryDao
+import com.jing.ddys.room.entity.EpisodeHistory
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
-class PlaybackViewModel : ViewModel() {
+class PlaybackViewModel(
+    private val videoDetail: VideoDetailInfo,
+    initEpisodeIndex: Int,
+    private val episodeHistoryDao: EpisodeHistoryDao,
+    private val videoHistoryDao: VideoHistoryDao
+) : ViewModel() {
     private val TAG = PlaybackViewModel::class.java.simpleName
-    private lateinit var videoDetail: VideoDetailInfo
-    private lateinit var _videoIndex: MutableStateFlow<Int>
+    private val _videoIndex: MutableStateFlow<Int> = MutableStateFlow(initEpisodeIndex)
     private val videoUrlCache = mutableMapOf<Int, VideoUrl>()
-    private val _videoUrl: MutableStateFlow<Resource<VideoUrl>> = MutableStateFlow(Resource.Loading)
+    private val _videoUrl: MutableStateFlow<Resource<VideoUrlWithHistory>> =
+        MutableStateFlow(Resource.Loading)
+
+
+    var currentPlayPosition: Long = 0L
+
+    var videoDuration: Long = 0L
+
+    private var _saveHistoryJob: Job? = null
 
     val videoIndex: StateFlow<Int>
         get() = _videoIndex
 
-    val videoUrl: StateFlow<Resource<VideoUrl>>
+    val videoUrl: StateFlow<Resource<VideoUrlWithHistory>>
         get() = _videoUrl
 
-    fun init(video: VideoDetailInfo, playVideoIndex: Int) {
-        videoDetail = video
-        _videoIndex = MutableStateFlow(playVideoIndex)
-        observeVideoIndex()
-    }
-
-    private fun observeVideoIndex() {
+    init {
         viewModelScope.launch {
             _videoIndex.collectLatest {
-/*
-                val cache = videoUrlCache[it]
-                if (cache != null) {
-                    _videoUrl.emit(Resource.Success(cache))
-                } else {
-                    queryVideoUrl(it)
-                }
-*/
                 queryVideoUrl(it)
             }
         }
     }
+
 
     private fun queryVideoUrl(videoIndex: Int) = viewModelScope.launch(Dispatchers.IO) {
         val ep = videoDetail.episodes[videoIndex]
@@ -86,7 +99,17 @@ class PlaybackViewModel : ViewModel() {
                 cacheFile.writeText(subtitle)
                 url = url.copy(subtitleUrl = cacheFile.toUri())
             }
-            _videoUrl.emit(Resource.Success(url))
+            val history = episodeHistoryDao.queryHistoryByEpisodeId(ep.id)
+            _videoUrl.emit(
+                Resource.Success(
+                    VideoUrlWithHistory(
+                        url = url,
+                        lastPlayPosition = history?.progress ?: 0L,
+                        videoDuration = history?.duration ?: 0L
+                    )
+                )
+            )
+            videoHistoryDao.updateLatestPlayedEpisode(videoDetail.id, ep.id)
             withContext(Dispatchers.Main) {
                 videoUrlCache[videoIndex] = url
             }
@@ -105,4 +128,60 @@ class PlaybackViewModel : ViewModel() {
             _videoIndex.emit(index)
         }
     }
+
+    fun playNextEpisodeIfExists() {
+        val curr = _videoIndex.value
+        if (curr < videoDetail.episodes.size - 1) {
+            changePlayVideoIndex(curr + 1)
+        }
+    }
+
+
+    fun startSaveHistory() {
+        stopSaveHistory()
+        val ep = videoDetail.episodes[_videoIndex.value]
+        _saveHistoryJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                episodeHistoryDao.save(
+                    EpisodeHistory(
+                        id = ep.id,
+                        videoId = videoDetail.id,
+                        name = ep.name,
+                        progress = currentPlayPosition,
+                        duration = videoDuration,
+                        timestamp = System.currentTimeMillis()
+                    )
+                )
+                delay(5000L)
+            }
+        }
+    }
+
+    fun saveHistory() {
+        val ep = videoDetail.episodes[_videoIndex.value]
+        viewModelScope.launch {
+            episodeHistoryDao.save(
+                EpisodeHistory(
+                    id = ep.id,
+                    videoId = videoDetail.id,
+                    name = ep.name,
+                    progress = currentPlayPosition,
+                    duration = videoDuration,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun stopSaveHistory() {
+        _saveHistoryJob?.cancel()
+        _saveHistoryJob = null
+    }
 }
+
+
+data class VideoUrlWithHistory(
+    val url: VideoUrl,
+    val lastPlayPosition: Long,
+    val videoDuration: Long
+)

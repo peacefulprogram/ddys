@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">低端影视</string>
+    <string name="button_retry">重试</string>
+    <string name="button_delete_all">删除全部</string>
+    <string name="button_delete">删除</string>
+    <string name="video_description">简介</string>
+    <string name="speak_search_keyword">请说出要搜索的内容</string>
+    <string name="input_search_keyword">输入关键词</string>
+    <string name="activity_search_result">搜索结果页</string>
+    <string name="title_search_result">搜索结果</string>
+    <string name="confirm_delete_template">是否删除%s?</string>
+    <string name="search_history">搜索历史:</string>
+    <string name="grid_no_data_tip">暂无数据</string>
+    <string name="playback_history">播放历史</string>
+    <string name="click_ok_del_tip">长按【ok】删除</string>
 </resources>

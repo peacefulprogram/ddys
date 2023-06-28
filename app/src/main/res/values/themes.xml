@@ -2,7 +2,4 @@
 
     <style name="Theme.Ddys" parent="@style/Theme.Leanback" />
 
-    <style name="CustomImageCardViewStyle" parent="Widget.Leanback.ImageCardView">
-        <item name="lbImageCardViewType">Title|Content</item>
-    </style>
 </resources>

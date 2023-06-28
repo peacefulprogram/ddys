@@ -2,12 +2,14 @@ package com.jing.ddys.repository
 
 
 data class VideoDetailInfo(
+    val id: String,
     val title: String,
     val coverUrl: String,
     val seasons: List<VideoSeason>,
     val episodes: List<VideoEpisode>,
     val relatedVideo: List<VideoCardInfo>,
     val rating: String,
+    val infoRows: List<String>,
     val description: String,
     val detailPageUrl: String
 ) : java.io.Serializable
