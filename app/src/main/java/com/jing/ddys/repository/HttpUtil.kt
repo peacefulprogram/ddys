@@ -180,7 +180,7 @@ object HttpUtil {
 
     fun queryVideoUrl(id: String, detailPageUrl: String): VideoUrl {
         val req = Request.Builder().header("referer", detailPageUrl)
-            .url("$BASE_URL/getvddr/video?id=$id&dim=1080P&type=mix").get().build()
+            .url("$BASE_URL/getvddr2/video?id=$id&type=mix").get().build()
         val resp = okHttpClient.newCall(req).execute().body!!.byteString().utf8()
         val map = gson.fromJson(resp, Map::class.java)
         val err = map["err"]

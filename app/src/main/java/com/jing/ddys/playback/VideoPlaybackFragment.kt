@@ -3,6 +3,7 @@ package com.jing.ddys.playback
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
@@ -19,6 +20,9 @@ import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.MediaItem.SubtitleConfiguration
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
+import com.google.android.exoplayer2.upstream.DefaultDataSource
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.google.android.exoplayer2.util.MimeTypes
 import com.jing.bilibilitv.playback.GlueActionCallback
 import com.jing.bilibilitv.playback.PlayListAction
@@ -27,6 +31,7 @@ import com.jing.ddys.ext.dpToPx
 import com.jing.ddys.ext.secondsToDuration
 import com.jing.ddys.ext.showLongToast
 import com.jing.ddys.ext.showShortToast
+import com.jing.ddys.repository.HttpUtil
 import com.jing.ddys.repository.Resource
 import com.jing.ddys.repository.VideoDetailInfo
 import kotlinx.coroutines.delay
@@ -37,9 +42,10 @@ import org.koin.core.parameter.parametersOf
 
 
 class VideoPlaybackFragment(
-    private val videoDetail: VideoDetailInfo,
-    private val playEpIndex: Int
+    private val videoDetail: VideoDetailInfo, private val playEpIndex: Int
 ) : VideoSupportFragment() {
+
+    private val TAG = VideoPlaybackFragment::class.java.simpleName
 
     private lateinit var viewModel: PlaybackViewModel
 
@@ -75,6 +81,7 @@ class VideoPlaybackFragment(
                         is Resource.Success -> {
                             val history = it.data
                             val (_, url, _, subtitleUrl) = history.url
+                            Log.d(TAG, "video url: $url")
                             exoplayer?.apply {
                                 val mediaItemBuilder = MediaItem.Builder()
                                     .setUri(url)
@@ -150,7 +157,12 @@ class VideoPlaybackFragment(
     }
 
     private fun buildPlayer() {
+        val factory =
+            DefaultDataSource.Factory(requireContext(), DefaultHttpDataSource.Factory().apply {
+                setDefaultRequestProperties(mapOf("user-agent" to HttpUtil.USER_AGENT))
+            })
         exoplayer = ExoPlayer.Builder(requireContext())
+            .setMediaSourceFactory(DefaultMediaSourceFactory(factory))
             .build().apply {
                 prepareGlue(this)
                 playWhenReady = true
@@ -185,12 +197,9 @@ class VideoPlaybackFragment(
     }
 
     private fun prepareGlue(localExoplayer: ExoPlayer) {
-        glue = ProgressTransportControlGlue(
-            context = requireContext(),
+        glue = ProgressTransportControlGlue(context = requireContext(),
             playerAdapter = LeanbackPlayerAdapter(
-                requireContext(),
-                localExoplayer,
-                200
+                requireContext(), localExoplayer, 200
             ),
             onCreatePrimaryAction = {
                 it.add(PlayListAction(requireContext()))
@@ -199,8 +208,7 @@ class VideoPlaybackFragment(
             updateProgress = {
                 viewModel.currentPlayPosition = localExoplayer.currentPosition
                 viewModel.videoDuration = localExoplayer.duration
-            }
-        ).apply {
+            }).apply {
             host = VideoSupportFragmentGlueHost(this@VideoPlaybackFragment)
             title = videoDetail.title
             // Enable seek manually since PlaybackTransportControlGlue.getSeekProvider() is null,
@@ -214,27 +222,25 @@ class VideoPlaybackFragment(
     }
 
 
-    private val replayActionCallback =
-        object : GlueActionCallback {
-            override fun support(action: Action): Boolean = action is ReplayAction
+    private val replayActionCallback = object : GlueActionCallback {
+        override fun support(action: Action): Boolean = action is ReplayAction
 
-            override fun onAction(action: Action) {
-                exoplayer?.seekTo(0L)
-                exoplayer?.play()
-                hideControlsOverlay(true)
-            }
-
+        override fun onAction(action: Action) {
+            exoplayer?.seekTo(0L)
+            exoplayer?.play()
+            hideControlsOverlay(true)
         }
 
-    private val changePlayVideoActionCallback =
-        object : GlueActionCallback {
-            override fun support(action: Action): Boolean = action is PlayListAction
+    }
 
-            override fun onAction(action: Action) {
-                openPlayListDialogAndChoose()
-            }
+    private val changePlayVideoActionCallback = object : GlueActionCallback {
+        override fun support(action: Action): Boolean = action is PlayListAction
 
+        override fun onAction(action: Action) {
+            openPlayListDialogAndChoose()
         }
+
+    }
 
 
     fun onKeyEvent(keyEvent: KeyEvent): Boolean {
@@ -275,12 +281,10 @@ class VideoPlaybackFragment(
 
     private fun openPlayListDialogAndChoose() {
         val fragmentManager = requireActivity().supportFragmentManager
-        ChooseEpisodeDialog(
-            dataList = videoDetail.episodes,
+        ChooseEpisodeDialog(dataList = videoDetail.episodes,
             defaultSelectIndex = viewModel.videoIndex.value,
             viewWidth = 60.dpToPx.toInt(),
-            getText = { _, item -> item.name }
-        ) { index, _ ->
+            getText = { _, item -> item.name }) { index, _ ->
             viewModel.changePlayVideoIndex(index)
         }.apply {
             showNow(fragmentManager, "")
