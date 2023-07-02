@@ -6,8 +6,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.graphics.drawable.toDrawable
+import androidx.leanback.app.ProgressBarManager
 import androidx.leanback.app.VideoSupportFragment
 import androidx.leanback.app.VideoSupportFragmentGlueHost
 import androidx.leanback.widget.Action
@@ -57,6 +59,8 @@ class VideoPlaybackFragment(
 
     private var backPressed = false
 
+    private lateinit var mProgressBarManager: ProgressBarManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewModel = get { parametersOf(videoDetail, playEpIndex) }
@@ -65,6 +69,9 @@ class VideoPlaybackFragment(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        mProgressBarManager = ProgressBarManager()
+        mProgressBarManager.setRootView(view as ViewGroup?)
+        mProgressBarManager.enableProgressBar()
         view.background = Color.BLACK.toDrawable()
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -79,19 +86,17 @@ class VideoPlaybackFragment(
                 viewModel.videoUrl.collectLatest {
                     when (it) {
                         is Resource.Success -> {
+                            mProgressBarManager.hide()
                             val history = it.data
                             val (_, url, _, subtitleUrl) = history.url
                             Log.d(TAG, "video url: $url")
                             exoplayer?.apply {
-                                val mediaItemBuilder = MediaItem.Builder()
-                                    .setUri(url)
+                                val mediaItemBuilder = MediaItem.Builder().setUri(url)
                                 if (subtitleUrl != null) {
                                     SubtitleConfiguration.Builder(subtitleUrl)
                                         .setMimeType(MimeTypes.TEXT_VTT)
                                         .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                                        .setLanguage("zh")
-                                        .build()
-                                        .run {
+                                        .setLanguage("zh").build().run {
                                             mediaItemBuilder.setSubtitleConfigurations(
                                                 listOf(
                                                     this
@@ -118,8 +123,12 @@ class VideoPlaybackFragment(
                             }
                         }
 
-                        is Resource.Error -> requireContext().showLongToast(it.message)
-                        else -> {}
+                        is Resource.Error -> {
+                            mProgressBarManager.hide()
+                            requireContext().showLongToast(it.message)
+                        }
+
+                        Resource.Loading -> mProgressBarManager.show()
                     }
                 }
             }
@@ -162,8 +171,7 @@ class VideoPlaybackFragment(
                 setDefaultRequestProperties(mapOf("user-agent" to HttpUtil.USER_AGENT))
             })
         exoplayer = ExoPlayer.Builder(requireContext())
-            .setMediaSourceFactory(DefaultMediaSourceFactory(factory))
-            .build().apply {
+            .setMediaSourceFactory(DefaultMediaSourceFactory(factory)).build().apply {
                 prepareGlue(this)
                 playWhenReady = true
                 addListener(object : Player.Listener {

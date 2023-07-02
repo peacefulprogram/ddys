@@ -12,8 +12,8 @@ android {
         applicationId = "com.jing.ddys"
         minSdk = 21
         targetSdk = 33
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -115,4 +115,7 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-common:$exoPlayerVersion")
     implementation("com.google.android.exoplayer:extension-leanback:$exoPlayerVersion")
     implementation("com.google.android.exoplayer:extension-okhttp:$exoPlayerVersion")
+
+    implementation("wang.harlon.quickjs:wrapper-android:0.20.2")
+
 }

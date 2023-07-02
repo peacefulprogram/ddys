@@ -1,18 +1,30 @@
 package com.jing.ddys.repository
 
+import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.google.gson.Gson
 import com.jing.ddys.BuildConfig
+import com.jing.ddys.DdysApplication
 import com.jing.ddys.ext.inflate
 import com.jing.ddys.ext.unGzip
+import com.whl.quickjs.android.QuickJSLoader
+import com.whl.quickjs.wrapper.QuickJSContext
+import okhttp3.Cookie
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
 import java.net.URL
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -23,10 +35,29 @@ import javax.net.ssl.X509TrustManager
 
 object HttpUtil {
 
+    private val TAG = HttpUtil::class.java.simpleName
+
     const val USER_AGENT =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
     const val BASE_URL = "https://ddys.pro"
+
+    @Volatile
+    var cookie_cf_bm: Pair<Long, String>? = null
+        private set
+
+    @Volatile
+    var cookie_cache_key: String = ""
+        private set
+
+    val sharedPreferences by lazy {
+        DdysApplication.context.getSharedPreferences("ddys", Context.MODE_PRIVATE)
+    }
+
     private val gson = Gson()
+
+    init {
+        QuickJSLoader.init()
+    }
 
     private val trustManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
@@ -39,26 +70,28 @@ object HttpUtil {
 
     }
 
-    val okHttpClient =
-        OkHttpClient.Builder().sslSocketFactory(buildSSLSocketFactory(), trustManager)
-            .hostnameVerifier { _, _ -> true }.apply {
-                if (BuildConfig.DEBUG) {
-                    addNetworkInterceptor(HttpLoggingInterceptor().apply {
-                        level = HttpLoggingInterceptor.Level.BASIC
-                    })
-                }
-            }.addInterceptor(Interceptor { chain ->
-                val originalReq = chain.request()
-                val builder = originalReq.newBuilder().header(
-                    "user-agent", USER_AGENT
-                )
-                if (originalReq.header("referer") == null) {
-                    builder.header("referer", "$BASE_URL/true-sight/")
-                }
-                builder.build().let {
-                    chain.proceed(it)
-                }
-            }).build()
+
+    val okHttpClient = OkHttpClient.Builder().readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .sslSocketFactory(buildSSLSocketFactory(), trustManager).hostnameVerifier { _, _ -> true }
+        .apply {
+            if (BuildConfig.DEBUG) {
+                addNetworkInterceptor(HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                })
+            }
+        }.addInterceptor(Interceptor { chain ->
+            val originalReq = chain.request()
+            val builder = originalReq.newBuilder().header(
+                "user-agent", USER_AGENT
+            )
+            if (originalReq.header("referer") == null) {
+                builder.header("referer", "$BASE_URL/true-sight/")
+            }
+            builder.build().let {
+                chain.proceed(it)
+            }
+        }).build()
 
     fun searchVideo(page: Int, keyword: String): BasePageResult<SearchResult> {
         val url = "$BASE_URL/page/$page/?s=${keyword}&post_type=post"
@@ -70,8 +103,8 @@ object HttpUtil {
                 url = href,
                 title = link.text().trim(),
                 desc = article.selectFirst(".entry-content>p")?.text()?.trim() ?: "",
-                updateTime = article.selectFirst(".meta_date")?.children()?.firstOrNull()
-                    ?.text() ?: ""
+                updateTime = article.selectFirst(".meta_date")?.children()?.firstOrNull()?.text()
+                    ?: ""
             )
         }
         val lastPage =
@@ -122,18 +155,23 @@ object HttpUtil {
     }
 
     fun queryDetailPage(pageUrl: String): VideoDetailInfo {
-        val html = okHttpClient.newCall(Request.Builder().url(pageUrl).get().build())
-            .execute().body!!.byteString().utf8()
+        val html =
+            okHttpClient.newCall(Request.Builder().url(pageUrl).get().build()).execute().apply {
+                if (cookie_cache_key.isEmpty()) {
+                    Cookie.parseAll(request.url, headers).find {
+                        it.name == "X_CACHE_KEY"
+                    }
+                }
+            }.body!!.byteString().utf8()
         val document = Jsoup.parse(html, pageUrl)
-        val seasonList = document.selectFirst(".page-links")?.children()
-            ?.map { season ->
-                val url = season.absUrl("href")
-                VideoSeason(
-                    seasonName = season.text().trim(),
-                    seasonUrl = url.takeIf { it.isNotEmpty() },
-                    currentSeason = url.isEmpty()
-                )
-            } ?: emptyList()
+        val seasonList = document.selectFirst(".page-links")?.children()?.map { season ->
+            val url = season.absUrl("href")
+            VideoSeason(
+                seasonName = season.text().trim(),
+                seasonUrl = url.takeIf { it.isNotEmpty() },
+                currentSeason = url.isEmpty()
+            )
+        } ?: emptyList()
         val relatedVideos = document.select(".crp_related li").map { li ->
             val url = li.selectFirst("a")!!.absUrl("href")
             val imgSrc = li.selectFirst("img")?.let {
@@ -179,9 +217,73 @@ object HttpUtil {
     }
 
     fun queryVideoUrl(id: String, detailPageUrl: String): VideoUrl {
+        var cfBm = cookie_cf_bm
+        if (cfBm == null || System.currentTimeMillis() - 10_000 < cfBm.first) {
+            var cacheKey = cookie_cache_key
+            if (cacheKey.isEmpty()) {
+                cacheKey = sharedPreferences.getString("cache_key", "") ?: ""
+                if (cacheKey.isNotEmpty()) {
+                    cookie_cache_key = cacheKey
+                }
+            }
+            if (cacheKey.isEmpty()) {
+                okHttpClient.newCall(Request.Builder().url(detailPageUrl).get().build()).execute()
+                    .apply {
+                        Cookie.parseAll(detailPageUrl.toHttpUrl(), headers)
+                            .find { it.name == "X_CACHE_KEY" }?.let { cacheKey = it.value }
+                    }
+                if (cacheKey.isEmpty()) {
+                    throw RuntimeException("未获取到CACHE_KEY")
+                }
+                cookie_cache_key = cacheKey
+                sharedPreferences.edit().putString("cache_key", cacheKey).apply()
+            }
+
+            val sParam = okHttpClient.newCall(
+                Request.Builder().url("$BASE_URL/cdn-cgi/challenge-platform/scripts/invisible.js")
+                    .get().build()
+            )
+                .execute()
+                .body!!
+                .byteString()
+                .utf8()
+                .let { js ->
+                    val end = js.indexOf("'.split(';')")
+                    var start = -1
+                    for (i in (end - 1) downTo 0) {
+                        if (js[i] == '\'') {
+                            start = i
+                            break
+                        }
+                    }
+                    if (start == -1) {
+                        throw RuntimeException("读取invisible.js失败")
+                    }
+                    js.substring((start + 1) until end).split(';').find {
+                        it.count { ch -> ch == ':' } == 2 && !it.startsWith('/')
+                    }
+                }
+
+            val param = mapOf(
+                "s" to sParam, "wp" to getParamWp()
+            )
+            Request.Builder().url("$BASE_URL/cdn-cgi/challenge-platform/h/g/cv/result/$cacheKey")
+                .post(gson.toJson(param).toRequestBody("application/json".toMediaType())).build()
+                .let { okHttpClient.newCall(it).execute() }.run {
+                    val ck = Cookie.parseAll(request.url, headers).find {
+                        it.name == "__cf_bm"
+                    } ?: throw RuntimeException("未获取到__cf_bm")
+                    cfBm = Pair(ck.expiresAt, ck.value)
+                    cookie_cf_bm = cfBm
+                }
+
+
+        }
         val req = Request.Builder().header("referer", detailPageUrl)
+            .header("cookie", "__cf_bm=${cfBm!!.second}; X_CACHE_KEY=${cookie_cache_key}")
             .url("$BASE_URL/getvddr2/video?id=$id&type=mix").get().build()
         val resp = okHttpClient.newCall(req).execute().body!!.byteString().utf8()
+        Log.d(TAG, "queryVideoUrl: $resp")
         val map = gson.fromJson(resp, Map::class.java)
         val err = map["err"]
         if (err != null) {
@@ -229,5 +331,21 @@ object HttpUtil {
         init(null, arrayOf(trustManager), SecureRandom())
     }.socketFactory
 
+
+    private fun getParamWp(): String {
+        val fmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss")
+        val time = fmt.format(Date())
+        val script = DdysApplication.context.assets.open("encrypt.js")
+            .bufferedReader(charset = Charsets.UTF_8).use {
+                it.readText()
+            }
+        return QuickJSContext.create().run {
+            try {
+                evaluate("$script;encodeParam('$time')") as String
+            } finally {
+                destroy()
+            }
+        }
+    }
 
 }
