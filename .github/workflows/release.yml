@@ -16,8 +16,17 @@ jobs:
       - name: Build
         run: |
           chmod a+x ./gradlew
-          ./gradlew :app:assemble
-          mv app/build/outputs/apk/release/app-release-unsigned.apk ddys-${{ github.ref_name }}.apk
+          ./gradlew :app:assembleRelease
+      - name: sign-apk
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PWD }}
+          keyPassword: ${{ secrets.KEY_PWD }}
+      - name: rename-apk
+        run: mv app/build/outputs/apk/release/app-release-unsigned-signed.apk ddys-${{ github.ref_name }}.apk
       - name: Release
         run: |
           gh release create ${{ github.ref_name }} ddys-${{ github.ref_name }}.apk
