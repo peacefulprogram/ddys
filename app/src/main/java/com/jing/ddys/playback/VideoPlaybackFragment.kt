@@ -20,15 +20,23 @@ import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.MediaItem.SubtitleConfiguration
+import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter
+import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSource
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
+import com.google.android.exoplayer2.source.MergingMediaSource
+import com.google.android.exoplayer2.source.SingleSampleMediaSource
+import com.google.android.exoplayer2.text.CueGroup
+import com.google.android.exoplayer2.ui.SubtitleView
 import com.google.android.exoplayer2.upstream.DefaultDataSource
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.google.android.exoplayer2.util.MimeTypes
+import com.google.common.net.HttpHeaders
 import com.jing.bilibilitv.playback.GlueActionCallback
 import com.jing.bilibilitv.playback.PlayListAction
 import com.jing.bilibilitv.playback.ReplayAction
+import com.jing.ddys.BuildConfig
+import com.jing.ddys.R
 import com.jing.ddys.ext.dpToPx
 import com.jing.ddys.ext.secondsToDuration
 import com.jing.ddys.ext.showLongToast
@@ -39,6 +47,8 @@ import com.jing.ddys.repository.VideoDetailInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.android.get
 import org.koin.core.parameter.parametersOf
 
@@ -59,6 +69,8 @@ class VideoPlaybackFragment(
 
     private var backPressed = false
 
+    private lateinit var mSubtitleView: SubtitleView
+
     private lateinit var mProgressBarManager: ProgressBarManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +81,7 @@ class VideoPlaybackFragment(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        mSubtitleView = requireActivity().findViewById(R.id.leanback_subtitles)
         mProgressBarManager = ProgressBarManager()
         mProgressBarManager.setRootView(view as ViewGroup?)
         mProgressBarManager.enableProgressBar()
@@ -91,20 +104,29 @@ class VideoPlaybackFragment(
                             val (_, url, _, subtitleUrl) = history.url
                             Log.d(TAG, "video url: $url")
                             exoplayer?.apply {
-                                val mediaItemBuilder = MediaItem.Builder().setUri(url)
+                                val videoMediaSource = mediaSourceFactory.createMediaSource(
+                                    MediaItem.Builder().setUri(url).build()
+                                )
                                 if (subtitleUrl != null) {
-                                    SubtitleConfiguration.Builder(subtitleUrl)
-                                        .setMimeType(MimeTypes.TEXT_VTT)
-                                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                                        .setLanguage("zh").build().run {
-                                            mediaItemBuilder.setSubtitleConfigurations(
-                                                listOf(
-                                                    this
-                                                )
-                                            )
-                                        }
+
+                                    val subtitleConfiguration =
+                                        SubtitleConfiguration.Builder(subtitleUrl)
+                                            .setMimeType(MimeTypes.TEXT_VTT)
+                                            .setSelectionFlags(C.SELECTION_FLAG_FORCED)
+                                            .setLanguage("zh").build()
+                                    val subtitleMediaSource =
+                                        SingleSampleMediaSource.Factory(dataSourceFactory)
+                                            .createMediaSource(subtitleConfiguration, C.TIME_UNSET)
+
+                                    exoplayer!!.setMediaSource(
+                                        MergingMediaSource(
+                                            videoMediaSource,
+                                            subtitleMediaSource
+                                        )
+                                    )
+                                } else {
+                                    exoplayer!!.setMediaSource(videoMediaSource)
                                 }
-                                exoplayer!!.setMediaItem(mediaItemBuilder.build())
                                 prepare()
                                 if (resumeFrom > 0) {
                                     seekTo(resumeFrom)
@@ -165,32 +187,67 @@ class VideoPlaybackFragment(
         }
     }
 
-    private fun buildPlayer() {
-        val factory =
-            DefaultDataSource.Factory(requireContext(), DefaultHttpDataSource.Factory().apply {
-                setDefaultRequestProperties(mapOf("user-agent" to HttpUtil.USER_AGENT))
-            })
-        exoplayer = ExoPlayer.Builder(requireContext())
-            .setMediaSourceFactory(DefaultMediaSourceFactory(factory)).build().apply {
-                prepareGlue(this)
-                playWhenReady = true
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == ExoPlayer.STATE_ENDED) {
-                            viewModel.playNextEpisodeIfExists()
-                        }
-                    }
-
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        if (isPlaying) {
-                            viewModel.startSaveHistory()
-                        } else {
-                            viewModel.saveHistory()
-                            viewModel.stopSaveHistory()
-                        }
-                    }
+    private val okHttpClient = OkHttpClient.Builder()
+        .apply {
+            if (BuildConfig.DEBUG) {
+                addNetworkInterceptor(HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.HEADERS
                 })
             }
+        }
+        .build()
+
+    private val dataSourceFactory by lazy {
+        DefaultDataSource.Factory(
+            requireContext(),
+            OkHttpDataSource.Factory { req ->
+                val newReq = req.newBuilder()
+                    .header(HttpHeaders.USER_AGENT, HttpUtil.USER_AGENT)
+                    .header(HttpHeaders.REFERER, HttpUtil.BASE_URL + '/')
+                    .build()
+                okHttpClient.newCall(newReq)
+            }
+        )
+    }
+
+    private val mediaSourceFactory by lazy {
+        DefaultMediaSourceFactory(dataSourceFactory)
+    }
+
+    private fun buildPlayer() {
+
+        exoplayer = ExoPlayer.Builder(requireContext()).build().apply {
+            trackSelectionParameters = trackSelectionParameters.buildUpon()
+                .setPreferredTextLanguage("zh")
+                .build()
+            prepareGlue(this)
+            playWhenReady = true
+            addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == ExoPlayer.STATE_ENDED) {
+                        viewModel.playNextEpisodeIfExists()
+                    }
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    if (isPlaying) {
+                        viewModel.startSaveHistory()
+                    } else {
+                        viewModel.saveHistory()
+                        viewModel.stopSaveHistory()
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    this@VideoPlaybackFragment.requireContext()
+                        .showLongToast("播放失败:${error.cause?.message ?: error.message}")
+                }
+
+                override fun onCues(cueGroup: CueGroup) {
+                    mSubtitleView.setCues(cueGroup.cues)
+                }
+            })
+        }
 
     }
 

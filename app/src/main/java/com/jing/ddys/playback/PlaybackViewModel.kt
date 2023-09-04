@@ -76,7 +76,14 @@ class PlaybackViewModel(
                     ""
                 }
             }
-            var url = HttpUtil.queryVideoUrl(ep.id, videoDetail.detailPageUrl)
+            var url = if (ep.src1.isNotEmpty()) {
+                HttpUtil.queryVideoUrl(ep.src1, videoDetail.detailPageUrl)
+            } else {
+                VideoUrl(
+                    type = VideoUrlType.URL,
+                    url = Uri.parse(HttpUtil.VIDEO_BASE_URL + ep.src0)
+                )
+            }
             if (url.type == VideoUrlType.M3U8_TEXT) {
                 val cacheFileName =
                     Uri.parse(videoDetail.detailPageUrl).path!!.trimStart('/').replace(

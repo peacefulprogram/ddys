@@ -1,6 +1,7 @@
 package com.jing.ddys.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
 import com.google.gson.Gson
@@ -41,6 +42,8 @@ object HttpUtil {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
     const val BASE_URL = "https://ddys.pro"
 
+    const val VIDEO_BASE_URL = "https://v.ddys.pro"
+
     @Volatile
     var cookie_cf_bm: Pair<Long, String>? = null
         private set
@@ -49,7 +52,7 @@ object HttpUtil {
     var cookie_cache_key: String = ""
         private set
 
-    val sharedPreferences by lazy {
+    private val sharedPreferences: SharedPreferences by lazy {
         DdysApplication.context.getSharedPreferences("ddys", Context.MODE_PRIVATE)
     }
 
@@ -190,19 +193,26 @@ object HttpUtil {
         val ratingNumber = infoArea.selectFirst(".rating_nums")!!.text()
         val infoRows =
             infoArea.selectFirst(".abstract")?.textNodes()?.map { it.text() } ?: emptyList()
-
+        val videoId = URL(pageUrl).path
         val tracks = gson.fromJson(
             document.select(".wp-playlist-script").html(), Map::class.java
         )["tracks"] as List<Map<String, Any>>
         val episodeList = tracks.map {
-            VideoEpisode(id = it["src1"] as String,
-                name = it["caption"] as String,
+            val src0 = (it["src0"] as String?) ?: ""
+            val src1 = (it["src1"] as String?) ?: ""
+            val name = it["caption"] as String
+            VideoEpisode(
+                id = src1.ifEmpty { "$videoId|$name" },
+                name = name,
                 subTitleUrl = it["subsrc"]?.toString()?.let {
                     "${BASE_URL}/subddr${it}"
-                } ?: "")
+                } ?: "",
+                src0 = src0,
+                src1 = src1,
+            )
         }
         return VideoDetailInfo(
-            id = URL(pageUrl).path,
+            id = videoId,
             title = title,
             coverUrl = cover ?: "",
             seasons = seasonList,
@@ -281,7 +291,7 @@ object HttpUtil {
         }
         val req = Request.Builder().header("referer", detailPageUrl)
             .header("cookie", "__cf_bm=${cfBm!!.second}; X_CACHE_KEY=${cookie_cache_key}")
-            .url("$BASE_URL/getvddr2/video?id=$id&type=mix").get().build()
+            .url("$BASE_URL/getvddr3/video?id=$id&type=json").get().build()
         val resp = okHttpClient.newCall(req).execute().body!!.byteString().utf8()
         Log.d(TAG, "queryVideoUrl: $resp")
         val map = gson.fromJson(resp, Map::class.java)

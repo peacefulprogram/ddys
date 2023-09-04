@@ -15,13 +15,13 @@ data class VideoDetailInfo(
 ) : java.io.Serializable
 
 data class VideoSeason(
-    val seasonName: String,
-    val seasonUrl: String?,
-    val currentSeason: Boolean
+    val seasonName: String, val seasonUrl: String?, val currentSeason: Boolean
 ) : java.io.Serializable
 
 data class VideoEpisode(
     val id: String,
     val name: String,
-    val subTitleUrl: String
+    val subTitleUrl: String,
+    val src0: String = "",
+    val src1: String = ""
 ) : java.io.Serializable

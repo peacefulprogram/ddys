@@ -12,8 +12,8 @@ android {
         applicationId = "com.jing.ddys"
         minSdk = 21
         targetSdk = 33
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.1.2"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -106,7 +106,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.16.1")
     implementation("com.google.code.gson:gson:2.10.1")
 
-    val exoPlayerVersion = "2.18.1"
+    val exoPlayerVersion = "2.19.1"
 
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
 
@@ -115,6 +115,7 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-common:$exoPlayerVersion")
     implementation("com.google.android.exoplayer:extension-leanback:$exoPlayerVersion")
     implementation("com.google.android.exoplayer:extension-okhttp:$exoPlayerVersion")
+    implementation("com.google.android.exoplayer:exoplayer-ui:$exoPlayerVersion")
 
     implementation("wang.harlon.quickjs:wrapper-android:0.20.2")
 
