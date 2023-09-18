@@ -26,6 +26,7 @@ import androidx.tv.material3.Text
 import com.jing.ddys.R
 
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun Loading(text: String = "Loading"): Unit {
     Column(

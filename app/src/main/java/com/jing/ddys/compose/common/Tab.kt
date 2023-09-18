@@ -43,15 +43,12 @@ fun CustomTabRow(
     initialFocusedIndex: Int = 0,
     onTabFocus: (Int) -> Unit = {}
 ) {
-    var anyTabFocused by remember {
-        mutableStateOf(false)
-    }
-    FocusGroup(modifier = modifier.onFocusChanged { anyTabFocused = it.hasFocus }) {
+    FocusGroup(modifier = modifier) {
         TabRow(selectedTabIndex = selectedTabIndex,
-            indicator = { tabPositions ->
+            indicator = { tabPositions,isActivated ->
                 FocusBorderTabRowIndicator(
                     currentTabPosition = tabPositions[selectedTabIndex],
-                    anyTabFocused = anyTabFocused
+                    anyTabFocused = isActivated
                 )
             }) {
             tabs.forEachIndexed { tabIndex, tabName ->
@@ -60,7 +57,6 @@ fun CustomTabRow(
                     onFocus = { onTabFocus(tabIndex) },
                     modifier = if (tabIndex == initialFocusedIndex) Modifier.initiallyFocused() else Modifier.restorableFocus(),
                     colors = TabDefaults.underlinedIndicatorTabColors(
-                        activeContentColor = colorResource(id = R.color.gray100),
                         selectedContentColor = colorResource(id = R.color.gray100),
                         focusedSelectedContentColor = colorResource(id = R.color.gray100)
                     )
@@ -90,12 +86,12 @@ fun FocusBorderTabRowIndicator(
             .wrapContentSize(Alignment.BottomStart)
             .offset()
     )
-    val width by animateDpAsState(targetValue = currentTabPosition.width)
+    val width by animateDpAsState(targetValue = currentTabPosition.width, label = "")
     val height = currentTabPosition.height
     val unfocusedIndicatorWidth = 10.dp
     val leftOffset = if (anyTabFocused) {
         animateDpAsState(
-            targetValue = currentTabPosition.left
+            targetValue = currentTabPosition.left, label = ""
         ).value
     } else {
         currentTabPosition.left + currentTabPosition.width / 2 - unfocusedIndicatorWidth / 2
@@ -105,7 +101,7 @@ fun FocusBorderTabRowIndicator(
     val borderColor by animateColorAsState(
         targetValue = if (anyTabFocused) MaterialTheme.colorScheme.border else MaterialTheme.colorScheme.border.copy(
             alpha = 0.5f
-        )
+        ), label = ""
     )
     if (anyTabFocused) {
         Box(

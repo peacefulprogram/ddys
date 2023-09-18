@@ -33,6 +33,7 @@ import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvGridItemSpan
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
 import androidx.tv.foundation.lazy.grid.rememberTvLazyGridState
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jing.ddys.R
@@ -47,6 +48,7 @@ import com.jing.ddys.repository.VideoCardInfo
 import com.jing.ddys.room.VideoEpisodeHistory
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun PlayHistoryScreen(viewModel: PlayHistoryViewModel) {
     val pagingItems = viewModel.pager.collectAsLazyPagingItems()

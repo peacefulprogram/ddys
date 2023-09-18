@@ -51,6 +51,7 @@ import com.jing.ddys.repository.SearchResult
 import com.jing.ddys.search.SearchResultViewModel
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SearchResultScreen(viewModel: SearchResultViewModel) {
     val pagingItems = viewModel.pager.collectAsLazyPagingItems()

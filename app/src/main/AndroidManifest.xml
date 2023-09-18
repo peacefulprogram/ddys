@@ -51,6 +51,10 @@
         <activity
             android:name=".history.PlayHistoryActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".setting.SettingsActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

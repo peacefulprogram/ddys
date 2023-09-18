@@ -65,6 +65,7 @@ import com.jing.ddys.search.SearchViewModel
 import com.jing.ddys.search.SpeechToTextParser
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SearchScreen(viewModel: SearchViewModel) {
 
@@ -89,8 +90,7 @@ fun SearchScreen(viewModel: SearchViewModel) {
 
 @OptIn(
     ExperimentalPermissionsApi::class,
-    ExperimentalTvMaterial3Api::class,
-    ExperimentalMaterial3Api::class
+    ExperimentalTvMaterial3Api::class
 )
 @Composable
 fun InputKeywordRow(onSearch: (String) -> Unit) {

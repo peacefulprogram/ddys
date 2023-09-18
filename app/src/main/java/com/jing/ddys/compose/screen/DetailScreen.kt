@@ -336,6 +336,7 @@ fun VideoEpisodeRow(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ContentWithTitle(
     title: String,

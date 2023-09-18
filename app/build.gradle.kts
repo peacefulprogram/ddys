@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.jing.ddys"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.jing.ddys"
@@ -25,14 +25,14 @@ android {
 
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
     kotlin {
-        jvmToolchain(11)
+        jvmToolchain(17)
     }
 
     buildTypes {
@@ -48,27 +48,27 @@ android {
         buildConfig = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.7"
+        kotlinCompilerExtensionVersion = "1.5.1"
     }
 }
 
 dependencies {
 
-    implementation("androidx.leanback:leanback-paging:1.1.0-alpha09")
-    val roomVersion = "2.5.1"
+    implementation("androidx.leanback:leanback-paging:1.1.0-alpha10")
+    val roomVersion = "2.5.2"
     val coilVersion = "2.4.0"
-    val composeTvVersion = "1.0.0-alpha07"
-    implementation("androidx.core:core-ktx:1.10.1")
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.0"))
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    val composeTvVersion = "1.0.0-alpha09"
+    implementation("androidx.core:core-ktx:1.12.0")
+//    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.0"))
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-compose:1.7.2")
-    implementation(platform("androidx.compose:compose-bom:2022.10.00"))
+    implementation(platform("androidx.compose:compose-bom:2023.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.leanback:leanback:1.0.0")
-    implementation("androidx.compose.material:material-icons-extended:1.4.3")
+    implementation("androidx.compose.material:material-icons-extended:1.5.1")
 
     implementation("androidx.leanback:leanback:1.0.0")
 
@@ -76,7 +76,7 @@ dependencies {
     implementation("com.google.accompanist:accompanist-permissions:0.30.1")
 
     // paging
-    implementation("androidx.paging:paging-compose:3.2.0-rc01")
+    implementation("androidx.paging:paging-compose:3.2.1")
 
     // compose tv
     implementation("androidx.tv:tv-foundation:$composeTvVersion")
@@ -108,7 +108,7 @@ dependencies {
 
     val exoPlayerVersion = "2.19.1"
 
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
 
     implementation("com.google.android.exoplayer:exoplayer-core:$exoPlayerVersion")
     implementation("com.google.android.exoplayer:exoplayer-hls:$exoPlayerVersion")
