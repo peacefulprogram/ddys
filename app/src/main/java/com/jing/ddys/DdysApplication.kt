@@ -15,6 +15,7 @@ import com.jing.ddys.repository.HttpUtil
 import com.jing.ddys.room.Dy555Database
 import com.jing.ddys.search.SearchResultViewModel
 import com.jing.ddys.search.SearchViewModel
+import com.jing.ddys.setting.SettingsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -59,6 +60,8 @@ class DdysApplication : Application(), ImageLoaderFactory {
             )
         }
         viewModelOf(::PlayHistoryViewModel)
+        viewModelOf(::SettingsViewModel)
+
     }
 
     private fun roomModule() = module {

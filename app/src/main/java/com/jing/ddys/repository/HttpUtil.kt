@@ -1,5 +1,6 @@
 package com.jing.ddys.repository
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -9,6 +10,8 @@ import com.jing.ddys.BuildConfig
 import com.jing.ddys.DdysApplication
 import com.jing.ddys.ext.inflate
 import com.jing.ddys.ext.unGzip
+import com.jing.ddys.setting.NetworkProxySettings
+import com.jing.ddys.setting.SettingsViewModel
 import com.whl.quickjs.android.QuickJSLoader
 import com.whl.quickjs.wrapper.QuickJSContext
 import okhttp3.Cookie
@@ -20,6 +23,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URL
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -40,9 +45,11 @@ object HttpUtil {
 
     const val USER_AGENT =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
-    const val BASE_URL = "https://ddys.pro"
 
     const val VIDEO_BASE_URL = "https://v.ddys.pro"
+    var BASE_URL = "https://ddys.pro"
+        private set
+
 
     @Volatile
     var cookie_cf_bm: Pair<Long, String>? = null
@@ -58,11 +65,13 @@ object HttpUtil {
 
     private val gson = Gson()
 
-    init {
-        QuickJSLoader.init()
-    }
 
-    private val trustManager = object : X509TrustManager {
+    @Volatile
+    lateinit var okHttpClient: OkHttpClient
+        private set
+
+    val trustManager = @SuppressLint("CustomX509TrustManager")
+    object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
         }
 
@@ -73,28 +82,14 @@ object HttpUtil {
 
     }
 
-
-    val okHttpClient = OkHttpClient.Builder().readTimeout(10, TimeUnit.SECONDS)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .sslSocketFactory(buildSSLSocketFactory(), trustManager).hostnameVerifier { _, _ -> true }
-        .apply {
-            if (BuildConfig.DEBUG) {
-                addNetworkInterceptor(HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                })
-            }
-        }.addInterceptor(Interceptor { chain ->
-            val originalReq = chain.request()
-            val builder = originalReq.newBuilder().header(
-                "user-agent", USER_AGENT
+    init {
+        QuickJSLoader.init()
+        buildOkhttpClientWithProxySetting(
+            NetworkProxySettings.loadFromSharedPreference(
+                SettingsViewModel.getSettingSharedPreference()
             )
-            if (originalReq.header("referer") == null) {
-                builder.header("referer", "$BASE_URL/true-sight/")
-            }
-            builder.build().let {
-                chain.proceed(it)
-            }
-        }).build()
+        )
+    }
 
     fun searchVideo(page: Int, keyword: String): BasePageResult<SearchResult> {
         val url = "$BASE_URL/page/$page/?s=${keyword}&post_type=post"
@@ -337,7 +332,7 @@ object HttpUtil {
         }
     }
 
-    private fun buildSSLSocketFactory(): SSLSocketFactory = SSLContext.getInstance("SSL").apply {
+    fun buildSSLSocketFactory(): SSLSocketFactory = SSLContext.getInstance("SSL").apply {
         init(null, arrayOf(trustManager), SecureRandom())
     }.socketFactory
 
@@ -357,5 +352,54 @@ object HttpUtil {
             }
         }
     }
+
+    fun resetOkhttpClientWithProxySettings(proxySettings: NetworkProxySettings) {
+        okHttpClient.dispatcher.executorService.shutdown()
+        okHttpClient.connectionPool.evictAll()
+        buildOkhttpClientWithProxySetting(proxySettings = proxySettings)
+    }
+
+    private fun buildOkhttpClientWithProxySetting(proxySettings: NetworkProxySettings) {
+        val builder = OkHttpClient.Builder()
+            .readTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .sslSocketFactory(buildSSLSocketFactory(), trustManager)
+            .hostnameVerifier { _, _ -> true }
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    addNetworkInterceptor(HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.BASIC
+                    })
+                }
+            }
+        if (BuildConfig.DEBUG) {
+            builder.addNetworkInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            })
+        }
+
+        builder.addInterceptor(Interceptor { chain ->
+            val originalReq = chain.request()
+            val reqBuilder = originalReq.newBuilder().header(
+                "user-agent", USER_AGENT
+            )
+            if (originalReq.header("referer") == null) {
+                reqBuilder.header("referer", "$BASE_URL/true-sight/")
+            }
+            reqBuilder.build().let {
+                chain.proceed(it)
+            }
+        })
+        if (proxySettings.proxyEnabled && proxySettings.proxyHost.isNotEmpty()) {
+            builder.proxy(
+                Proxy(
+                    Proxy.Type.HTTP,
+                    InetSocketAddress(proxySettings.proxyHost, proxySettings.proxyPort)
+                )
+            )
+        }
+        okHttpClient = builder.build()
+    }
+
 
 }

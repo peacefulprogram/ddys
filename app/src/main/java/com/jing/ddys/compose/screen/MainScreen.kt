@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +55,7 @@ import com.jing.ddys.history.PlayHistoryActivity
 import com.jing.ddys.main.MainViewModel
 import com.jing.ddys.repository.VideoCardInfo
 import com.jing.ddys.search.SearchActivity
+import com.jing.ddys.setting.SettingsActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -160,6 +162,16 @@ fun TopNav(
                                 Icon(
                                     imageVector = Icons.Default.History,
                                     contentDescription = "history"
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    SettingsActivity.navigateTo(context)
+                                }, modifier = Modifier.restorableFocus()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "settings"
                                 )
                             }
 

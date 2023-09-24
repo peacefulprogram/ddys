@@ -16,21 +16,21 @@ import androidx.leanback.widget.Action
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.google.android.exoplayer2.C
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.MediaItem.SubtitleConfiguration
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter
-import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSource
-import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
-import com.google.android.exoplayer2.source.MergingMediaSource
-import com.google.android.exoplayer2.source.SingleSampleMediaSource
-import com.google.android.exoplayer2.text.CueGroup
-import com.google.android.exoplayer2.ui.SubtitleView
-import com.google.android.exoplayer2.upstream.DefaultDataSource
-import com.google.android.exoplayer2.util.MimeTypes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.text.CueGroup
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import androidx.media3.ui.SubtitleView
+import androidx.media3.ui.leanback.LeanbackPlayerAdapter
 import com.google.common.net.HttpHeaders
 import com.jing.bilibilitv.playback.GlueActionCallback
 import com.jing.bilibilitv.playback.PlayListAction
@@ -44,6 +44,8 @@ import com.jing.ddys.ext.showShortToast
 import com.jing.ddys.repository.HttpUtil
 import com.jing.ddys.repository.Resource
 import com.jing.ddys.repository.VideoDetailInfo
+import com.jing.ddys.setting.NetworkProxySettings
+import com.jing.ddys.setting.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -51,8 +53,11 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.android.get
 import org.koin.core.parameter.parametersOf
+import java.net.InetSocketAddress
+import java.net.Proxy
 
 
+@UnstableApi
 class VideoPlaybackFragment(
     private val videoDetail: VideoDetailInfo, private val playEpIndex: Int
 ) : VideoSupportFragment() {
@@ -110,7 +115,7 @@ class VideoPlaybackFragment(
                                 if (subtitleUrl != null) {
 
                                     val subtitleConfiguration =
-                                        SubtitleConfiguration.Builder(subtitleUrl)
+                                        MediaItem.SubtitleConfiguration.Builder(subtitleUrl)
                                             .setMimeType(MimeTypes.TEXT_VTT)
                                             .setSelectionFlags(C.SELECTION_FLAG_FORCED)
                                             .setLanguage("zh").build()
@@ -188,11 +193,26 @@ class VideoPlaybackFragment(
     }
 
     private val okHttpClient = OkHttpClient.Builder()
+        .sslSocketFactory(HttpUtil.buildSSLSocketFactory(), HttpUtil.trustManager)
+        .hostnameVerifier { _, _ -> true }
         .apply {
             if (BuildConfig.DEBUG) {
                 addNetworkInterceptor(HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.HEADERS
                 })
+            }
+            val networkProxySettings =
+                NetworkProxySettings.loadFromSharedPreference(SettingsViewModel.getSettingSharedPreference())
+            if (networkProxySettings.proxyEnabled && networkProxySettings.proxyHost.isNotEmpty()) {
+                proxy(
+                    Proxy(
+                        Proxy.Type.HTTP,
+                        InetSocketAddress(
+                            networkProxySettings.proxyHost,
+                            networkProxySettings.proxyPort
+                        )
+                    )
+                )
             }
         }
         .build()
@@ -354,6 +374,14 @@ class VideoPlaybackFragment(
         }.apply {
             showNow(fragmentManager, "")
         }
+    }
+
+    override fun onVideoSizeChanged(width: Int, height: Int) {
+        // (see https://github.com/androidx/media/issues/617).
+        if (width == 0 || height == 0) {
+            return
+        }
+        super.onVideoSizeChanged(width, height)
     }
 
 
