@@ -39,6 +39,8 @@ class PlaybackViewModel(
     private val _videoUrl: MutableStateFlow<Resource<VideoUrlWithHistory>> =
         MutableStateFlow(Resource.Loading)
 
+    private var requestVideoUrlJob: Job? = null
+
 
     var currentPlayPosition: Long = 0L
 
@@ -61,70 +63,73 @@ class PlaybackViewModel(
     }
 
 
-    private fun queryVideoUrl(videoIndex: Int) = viewModelScope.launch(Dispatchers.IO) {
-        val ep = videoDetail.episodes[videoIndex]
-        _videoUrl.emit(Resource.Loading)
-        try {
-            val subtitleJob = async {
-                try {
-                    HttpUtil.downloadSubtitles(videoDetail.episodes[videoIndex].subTitleUrl)
-                } catch (e: Exception) {
-                    if (e is CancellationException) {
-                        throw e
+    private fun queryVideoUrl(videoIndex: Int) {
+        requestVideoUrlJob?.cancel()
+        requestVideoUrlJob = viewModelScope.launch(Dispatchers.IO) {
+            val ep = videoDetail.episodes[videoIndex]
+            _videoUrl.emit(Resource.Loading)
+            try {
+                val subtitleJob = async {
+                    try {
+                        HttpUtil.downloadSubtitles(videoDetail.episodes[videoIndex].subTitleUrl)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) {
+                            throw e
+                        }
+                        Log.e(TAG, "下载字幕出错: ${e.message}", e)
+                        ""
                     }
-                    Log.e(TAG, "下载字幕出错: ${e.message}", e)
-                    ""
                 }
-            }
-            var url = if (ep.src1.isNotEmpty()) {
-                HttpUtil.queryVideoUrl(ep.src1, videoDetail.detailPageUrl)
-            } else {
-                VideoUrl(
-                    type = VideoUrlType.URL,
-                    url = Uri.parse(HttpUtil.VIDEO_BASE_URL + ep.src0)
-                )
-            }
-            if (url.type == VideoUrlType.M3U8_TEXT) {
-                val cacheFileName =
-                    Uri.parse(videoDetail.detailPageUrl).path!!.trimStart('/').replace(
-                        '/',
-                        '-'
-                    ) + videoDetail.episodes[videoIndex].name + '-' + videoIndex + ".m3u8"
-                val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
-                cacheFile.writeText(url.m3u8Text)
-                url = url.copy(url = cacheFile.toUri())
-            }
-            val subtitle = subtitleJob.await()
-            if (subtitle.isNotEmpty()) {
-                val cacheFileName =
-                    Uri.parse(videoDetail.episodes[videoIndex].subTitleUrl).path!!.trimStart('/')
-                        .replace(
+                var url = if (ep.src1.isNotEmpty()) {
+                    HttpUtil.queryVideoUrl(ep.src1, videoDetail.detailPageUrl)
+                } else {
+                    VideoUrl(
+                        type = VideoUrlType.URL,
+                        url = Uri.parse(HttpUtil.VIDEO_BASE_URL + ep.src0)
+                    )
+                }
+                if (url.type == VideoUrlType.M3U8_TEXT) {
+                    val cacheFileName =
+                        Uri.parse(videoDetail.detailPageUrl).path!!.trimStart('/').replace(
                             '/',
                             '-'
-                        ) + ".vtt"
-                val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
-                cacheFile.writeText(subtitle)
-                url = url.copy(subtitleUrl = cacheFile.toUri())
-            }
-            val history = episodeHistoryDao.queryHistoryByEpisodeId(ep.id)
-            _videoUrl.emit(
-                Resource.Success(
-                    VideoUrlWithHistory(
-                        url = url,
-                        lastPlayPosition = history?.progress ?: 0L,
-                        videoDuration = history?.duration ?: 0L
+                        ) + videoDetail.episodes[videoIndex].name + '-' + videoIndex + ".m3u8"
+                    val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
+                    cacheFile.writeText(url.m3u8Text)
+                    url = url.copy(url = cacheFile.toUri())
+                }
+                val subtitle = subtitleJob.await()
+                if (subtitle.isNotEmpty()) {
+                    val cacheFileName =
+                        Uri.parse(videoDetail.episodes[videoIndex].subTitleUrl).path!!.trimStart('/')
+                            .replace(
+                                '/',
+                                '-'
+                            ) + ".vtt"
+                    val cacheFile = File(DdysApplication.context.cacheDir, cacheFileName)
+                    cacheFile.writeText(subtitle)
+                    url = url.copy(subtitleUrl = cacheFile.toUri())
+                }
+                val history = episodeHistoryDao.queryHistoryByEpisodeId(ep.id)
+                _videoUrl.emit(
+                    Resource.Success(
+                        VideoUrlWithHistory(
+                            url = url,
+                            lastPlayPosition = history?.progress ?: 0L,
+                            videoDuration = history?.duration ?: 0L
+                        )
                     )
                 )
-            )
-            videoHistoryDao.updateLatestPlayedEpisode(videoDetail.id, ep.id)
-            withContext(Dispatchers.Main) {
-                videoUrlCache[videoIndex] = url
+                videoHistoryDao.updateLatestPlayedEpisode(videoDetail.id, ep.id)
+                withContext(Dispatchers.Main) {
+                    videoUrlCache[videoIndex] = url
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "查询视频链接失败:${e.message}", e)
+                _videoUrl.emit(Resource.Error("查询视频链接失败:${e.message}", e))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "查询视频链接失败:${e.message}", e)
-            _videoUrl.emit(Resource.Error("查询视频链接失败:${e.message}", e))
-        }
 
+        }
     }
 
     fun changePlayVideoIndex(index: Int) {
