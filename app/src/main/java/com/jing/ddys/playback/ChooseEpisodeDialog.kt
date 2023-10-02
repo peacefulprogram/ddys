@@ -5,13 +5,19 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.view.*
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.RecyclerView.*
+import androidx.recyclerview.widget.RecyclerView.Adapter
+import androidx.recyclerview.widget.RecyclerView.ItemDecoration
+import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.jing.ddys.R
 import com.jing.ddys.databinding.ChooseItemIndicatorLayoutBinding
 import com.jing.ddys.ext.dpToPx
@@ -24,6 +30,15 @@ class ChooseEpisodeDialog<T>(
     private val getText: (position: Int, item: T) -> String,
     private val onChoose: (position: Int, item: T) -> Unit
 ) : DialogFragment() {
+
+    constructor() : this(
+        dataList = emptyList(),
+        defaultSelectIndex = -1,
+        getText = { _, _ -> "" },
+        viewWidth = 120,
+        onChoose = { _, _ -> }
+    )
+
 
     private lateinit var recyclerView: RecyclerView
 

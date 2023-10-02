@@ -37,7 +37,6 @@ import com.jing.bilibilitv.playback.PlayListAction
 import com.jing.bilibilitv.playback.ReplayAction
 import com.jing.ddys.BuildConfig
 import com.jing.ddys.R
-import com.jing.ddys.ext.dpToPx
 import com.jing.ddys.ext.secondsToDuration
 import com.jing.ddys.ext.showLongToast
 import com.jing.ddys.ext.showShortToast
@@ -58,9 +57,11 @@ import java.net.Proxy
 
 
 @UnstableApi
-class VideoPlaybackFragment(
-    private val videoDetail: VideoDetailInfo, private val playEpIndex: Int
-) : VideoSupportFragment() {
+class VideoPlaybackFragment : VideoSupportFragment() {
+
+
+    private lateinit var videoDetail: VideoDetailInfo
+    private var playEpIndex: Int = 0
 
     private val TAG = VideoPlaybackFragment::class.java.simpleName
 
@@ -80,6 +81,9 @@ class VideoPlaybackFragment(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        videoDetail =
+            requireActivity().intent.getSerializableExtra(VideoPlaybackActivity.VIDEO_KEY) as VideoDetailInfo
+        playEpIndex = requireActivity().intent.getIntExtra(VideoPlaybackActivity.PLAY_INDEX, 0)
         viewModel = get { parametersOf(videoDetail, playEpIndex) }
         isControlsOverlayAutoHideEnabled = true
     }
@@ -368,7 +372,7 @@ class VideoPlaybackFragment(
         val fragmentManager = requireActivity().supportFragmentManager
         ChooseEpisodeDialog(dataList = videoDetail.episodes,
             defaultSelectIndex = viewModel.videoIndex.value,
-            viewWidth = 60.dpToPx.toInt(),
+            viewWidth = 120,
             getText = { _, item -> item.name }) { index, _ ->
             viewModel.changePlayVideoIndex(index)
         }.apply {
