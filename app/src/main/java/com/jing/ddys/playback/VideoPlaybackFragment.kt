@@ -372,7 +372,6 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         val fragmentManager = requireActivity().supportFragmentManager
         ChooseEpisodeDialog(dataList = videoDetail.episodes,
             defaultSelectIndex = viewModel.videoIndex.value,
-            viewWidth = 120,
             getText = { _, item -> item.name }) { index, _ ->
             viewModel.changePlayVideoIndex(index)
         }.apply {

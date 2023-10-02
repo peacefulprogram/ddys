@@ -4,7 +4,9 @@ import android.content.DialogInterface
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -20,13 +22,11 @@ import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.jing.ddys.R
 import com.jing.ddys.databinding.ChooseItemIndicatorLayoutBinding
-import com.jing.ddys.ext.dpToPx
 import com.jing.ddys.ext.getColorWithAlpha
 
 class ChooseEpisodeDialog<T>(
     private val dataList: List<T>,
     private val defaultSelectIndex: Int,
-    private val viewWidth: Int,
     private val getText: (position: Int, item: T) -> String,
     private val onChoose: (position: Int, item: T) -> Unit
 ) : DialogFragment() {
@@ -35,7 +35,6 @@ class ChooseEpisodeDialog<T>(
         dataList = emptyList(),
         defaultSelectIndex = -1,
         getText = { _, _ -> "" },
-        viewWidth = 120,
         onChoose = { _, _ -> }
     )
 
@@ -48,7 +47,7 @@ class ChooseEpisodeDialog<T>(
         super.onStart()
         dialog?.window?.attributes?.run {
             height = WindowManager.LayoutParams.MATCH_PARENT
-            width = viewWidth.dpToPx.toInt()
+            width = getWindowWidth() / 4
             gravity = Gravity.END
             dialog!!.window!!.attributes = this
         }
@@ -64,6 +63,13 @@ class ChooseEpisodeDialog<T>(
         }
     }
 
+    private fun getWindowWidth(): Int = if (Build.VERSION.SDK_INT >= 30) {
+        requireActivity().windowManager.currentWindowMetrics.bounds.width()
+    } else {
+        DisplayMetrics().apply {
+            requireActivity().windowManager.defaultDisplay.getMetrics(this)
+        }.widthPixels
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
