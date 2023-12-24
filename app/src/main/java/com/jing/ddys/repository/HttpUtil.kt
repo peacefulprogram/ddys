@@ -245,7 +245,7 @@ object HttpUtil {
             }
 
             val sParam = okHttpClient.newCall(
-                Request.Builder().url("$BASE_URL/cdn-cgi/challenge-platform/scripts/invisible.js")
+                Request.Builder().url("$BASE_URL/cdn-cgi/challenge-platform/scripts/jsd/main.js")
                     .get().build()
             )
                 .execute()
@@ -262,7 +262,7 @@ object HttpUtil {
                         }
                     }
                     if (start == -1) {
-                        throw RuntimeException("读取invisible.js失败")
+                        throw RuntimeException("读取main.js失败")
                     }
                     js.substring((start + 1) until end).split(';').find {
                         it.count { ch -> ch == ':' } == 2 && !it.startsWith('/')
