@@ -17,14 +17,14 @@ import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
 import com.jing.ddys.compose.screen.PlayHistoryScreen
 import com.jing.ddys.compose.theme.DdysTheme
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class PlayHistoryActivity : ComponentActivity() {
 
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val viewModel = get<PlayHistoryViewModel>()
+        val viewModel by viewModel<PlayHistoryViewModel>()
         setContent {
             DdysTheme {
                 Box(

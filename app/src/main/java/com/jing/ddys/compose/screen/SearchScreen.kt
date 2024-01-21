@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -41,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.tv.foundation.ExperimentalTvFoundationApi
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.rememberTvLazyListState
@@ -190,7 +190,7 @@ fun SearchHistory(viewModel: SearchViewModel, onKeywordClick: (String) -> Unit) 
     FocusGroup {
         TvLazyColumn(
             state = listState, content = {
-                items(pagingItems.itemCount, key = { pagingItems[it]?.keyword ?: it }) {
+                items(pagingItems.itemCount, key = pagingItems.itemKey { it.keyword }) {
                     val history = pagingItems[it]
                     if (history != null) {
                         Keyword(text = history.keyword,

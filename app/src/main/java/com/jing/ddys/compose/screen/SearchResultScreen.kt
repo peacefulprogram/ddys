@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvGridItemSpan
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
@@ -46,6 +47,7 @@ import androidx.tv.material3.Text
 import com.jing.ddys.R
 import com.jing.ddys.compose.common.ErrorTip
 import com.jing.ddys.compose.common.Loading
+import com.jing.ddys.compose.common.appendEnd
 import com.jing.ddys.detail.DetailActivity
 import com.jing.ddys.repository.SearchResult
 import com.jing.ddys.search.SearchResultViewModel
@@ -90,7 +92,9 @@ fun SearchResultScreen(viewModel: SearchResultViewModel) {
                             .focusable()
                     )
                 }
-                items(count = pagingItems.itemCount) { videoIndex ->
+                items(
+                    count = pagingItems.itemCount,
+                    key = pagingItems.itemKey { it.url }) { videoIndex ->
                     val video = pagingItems[videoIndex]!!
                     SearchResultCard(modifier = Modifier.size(videoWidth, videoHeight),
                         searchResult = video,
@@ -115,6 +119,9 @@ fun SearchResultScreen(viewModel: SearchResultViewModel) {
                         }
                     }
                 }
+
+                appendEnd(pagingItems.loadState.append, pagingItems.itemCount > 0)
+
             })
 
         if (pagingItems.itemCount == 0) {

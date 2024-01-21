@@ -50,7 +50,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.getActivityViewModel
 import org.koin.core.parameter.parametersOf
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -84,7 +84,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         videoDetail =
             requireActivity().intent.getSerializableExtra(VideoPlaybackActivity.VIDEO_KEY) as VideoDetailInfo
         playEpIndex = requireActivity().intent.getIntExtra(VideoPlaybackActivity.PLAY_INDEX, 0)
-        viewModel = get { parametersOf(videoDetail, playEpIndex) }
+        viewModel = getActivityViewModel { parametersOf(videoDetail, playEpIndex) }
         isControlsOverlayAutoHideEnabled = true
     }
 

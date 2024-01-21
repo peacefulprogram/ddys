@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvGridItemSpan
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
@@ -41,6 +42,7 @@ import com.jing.ddys.compose.common.ConfirmDeleteDialog
 import com.jing.ddys.compose.common.ErrorTip
 import com.jing.ddys.compose.common.Loading
 import com.jing.ddys.compose.common.VideoCard
+import com.jing.ddys.compose.common.appendEnd
 import com.jing.ddys.detail.DetailActivity
 import com.jing.ddys.history.PlayHistoryViewModel
 import com.jing.ddys.repository.HttpUtil
@@ -99,7 +101,9 @@ fun PlayHistoryScreen(viewModel: PlayHistoryViewModel) {
                         )
                     }
                 }
-                items(count = pagingItems.itemCount) { videoIndex ->
+                items(
+                    count = pagingItems.itemCount,
+                    key = pagingItems.itemKey { it.videoId to it.epId }) { videoIndex ->
                     val video = pagingItems[videoIndex]!!
                     Box(
                         modifier = Modifier.size(containerWidth, containerHeight),
@@ -137,6 +141,9 @@ fun PlayHistoryScreen(viewModel: PlayHistoryViewModel) {
                         )
                     }
                 }
+
+                appendEnd(pagingItems.loadState.append, pagingItems.itemCount > 0)
+
             }
         )
 

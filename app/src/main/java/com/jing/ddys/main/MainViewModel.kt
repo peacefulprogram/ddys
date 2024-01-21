@@ -20,7 +20,7 @@ class MainViewModel : ViewModel() {
 
     val pager = Pager(
         config = PagingConfig(
-            pageSize = 24, prefetchDistance = 3
+            pageSize = 24, prefetchDistance = 50
         )
     ) {
         BasicPagingSource {

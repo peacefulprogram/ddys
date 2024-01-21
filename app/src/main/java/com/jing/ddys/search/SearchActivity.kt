@@ -18,14 +18,14 @@ import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
 import com.jing.ddys.compose.screen.SearchScreen
 import com.jing.ddys.compose.theme.DdysTheme
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class SearchActivity : ComponentActivity() {
 
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val viewModel = get<SearchViewModel>()
+        val viewModel by viewModel<SearchViewModel>()
         setContent {
             DdysTheme {
                 Box(

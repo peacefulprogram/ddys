@@ -18,7 +18,7 @@ import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
 import com.jing.ddys.compose.screen.DetailScreen
 import com.jing.ddys.compose.theme.DdysTheme
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.parameter.parametersOf
 
 class DetailActivity : ComponentActivity() {
@@ -27,7 +27,7 @@ class DetailActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val url = intent.getStringExtra(URL_KEY)!!
-        val viewModel = get<DetailViewModel> { parametersOf(url) }
+        val viewModel by viewModel<DetailViewModel> { parametersOf(url) }
         setContent {
             DdysTheme {
                 Box(

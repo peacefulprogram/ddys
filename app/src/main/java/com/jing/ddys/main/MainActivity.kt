@@ -16,7 +16,7 @@ import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
 import com.jing.ddys.compose.screen.MainScreen
 import com.jing.ddys.compose.theme.DdysTheme
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
 /**
  * Loads [MainFragment].
@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val viewModel by viewModel<MainViewModel>()
         setContent {
             DdysTheme {
                 Box(
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
                         .fillMaxWidth()
                 ) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                        MainScreen(viewModel = get())
+                        MainScreen(viewModel = viewModel)
                     }
                 }
             }

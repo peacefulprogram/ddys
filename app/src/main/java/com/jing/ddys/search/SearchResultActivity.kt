@@ -18,7 +18,7 @@ import androidx.tv.material3.MaterialTheme
 import com.jing.ddys.R
 import com.jing.ddys.compose.screen.SearchResultScreen
 import com.jing.ddys.compose.theme.DdysTheme
-import org.koin.android.ext.android.get
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.parameter.parametersOf
 
 class SearchResultActivity : ComponentActivity() {
@@ -27,7 +27,7 @@ class SearchResultActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val keyword = intent.getStringExtra("k")!!
-        val viewModel = get<SearchResultViewModel> { parametersOf(keyword) }
+        val viewModel by viewModel<SearchResultViewModel> { parametersOf(keyword) }
         setContent {
             DdysTheme {
                 Box(

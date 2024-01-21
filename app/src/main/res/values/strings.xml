@@ -19,4 +19,5 @@
     <string name="button_save">保存</string>
     <string name="network_proxy_setting_host_title">域名/IP</string>
     <string name="network_proxy_setting_port_title">端口</string>
+    <string name="paging_reach_end_tip">没有更多了～</string>
 </resources>

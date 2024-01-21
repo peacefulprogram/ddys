@@ -122,7 +122,7 @@ object HttpUtil {
     fun queryVideoOfCategory(pageUrl: String, page: Int): BasePageResult<VideoCardInfo> {
         var finalUrl = BASE_URL + pageUrl
         if (page > 1) {
-            finalUrl = "$finalUrl/page/$page/"
+            finalUrl = "${finalUrl.trimEnd('/')}/page/$page/"
         }
         val resp = okHttpClient.newCall(Request.Builder().url(finalUrl).get().build()).execute()
         val html = resp.body!!.byteString().utf8()

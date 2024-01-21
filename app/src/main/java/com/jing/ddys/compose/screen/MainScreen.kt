@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.tv.foundation.ExperimentalTvFoundationApi
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
@@ -50,6 +51,7 @@ import com.jing.ddys.compose.common.ErrorTip
 import com.jing.ddys.compose.common.FocusGroup
 import com.jing.ddys.compose.common.Loading
 import com.jing.ddys.compose.common.VideoCard
+import com.jing.ddys.compose.common.appendEnd
 import com.jing.ddys.detail.DetailActivity
 import com.jing.ddys.history.PlayHistoryActivity
 import com.jing.ddys.main.MainViewModel
@@ -198,6 +200,7 @@ fun TopNav(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun VideoGrid(
     viewModel: MainViewModel,
@@ -244,7 +247,7 @@ fun VideoGrid(
         columns = TvGridCells.Adaptive(videoCardContainerWidth),
         state = gridState,
         content = {
-            items(count = pagingItems.itemCount) {
+            items(count = pagingItems.itemCount, key = pagingItems.itemKey { it.url }) {
                 Box(
                     modifier = Modifier.size(videoCardContainerWidth, videoCardContainerHeight),
                     contentAlignment = Alignment.Center
@@ -277,5 +280,8 @@ fun VideoGrid(
                         })
                 }
             }
+
+            appendEnd(pagingItems.loadState.append, pagingItems.itemCount > 0)
+
         })
 }
