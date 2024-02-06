@@ -211,7 +211,7 @@ object HttpUtil {
             title = title,
             coverUrl = cover ?: "",
             seasons = seasonList,
-            episodes = episodeList,
+            episodes = episodeList.distinctBy { it.id },
             relatedVideo = relatedVideos,
             rating = ratingNumber,
             description = infoRows.lastOrNull() ?: "",
