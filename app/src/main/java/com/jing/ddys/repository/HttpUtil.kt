@@ -180,14 +180,23 @@ object HttpUtil {
                 imageUrl = imgSrc, title = title, subTitle = null, url = url
             )
         }
-        val infoArea = document.selectFirst(".doulist-subject")!!
-        val title = infoArea.selectFirst(".title")!!.text().trim()
-        val cover = infoArea.selectFirst(".post img")!!.let {
+        val infoArea = document.selectFirst(".doulist-subject")
+        val title =
+            infoArea?.selectFirst(".title")?.text()?.trim() ?: document.selectFirst(".post-title")!!
+                .text().run {
+                val idx = indexOfAny(charArrayOf('(', '（'))
+                if (idx > 0) {
+                    substring(0, idx).trim()
+                } else {
+                    trim()
+                }
+            }
+        val cover = infoArea?.selectFirst(".post img")?.let {
             it.attr("src") ?: it.dataset()["src"]
         }
-        val ratingNumber = infoArea.selectFirst(".rating_nums")!!.text()
+        val ratingNumber = infoArea?.selectFirst(".rating_nums")?.text()
         val infoRows =
-            infoArea.selectFirst(".abstract")?.textNodes()?.map { it.text() } ?: emptyList()
+            infoArea?.selectFirst(".abstract")?.textNodes()?.map { it.text() } ?: emptyList()
         val videoId = URL(pageUrl).path
         val tracks = gson.fromJson(
             document.select(".wp-playlist-script").html(), Map::class.java
@@ -213,7 +222,7 @@ object HttpUtil {
             seasons = seasonList,
             episodes = episodeList.distinctBy { it.id },
             relatedVideo = relatedVideos,
-            rating = ratingNumber,
+            rating = ratingNumber ?: "",
             description = infoRows.lastOrNull() ?: "",
             infoRows = if (infoRows.isNotEmpty()) infoRows.slice(0 until infoRows.size - 1) else emptyList(),
             detailPageUrl = pageUrl
