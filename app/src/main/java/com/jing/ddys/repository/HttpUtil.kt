@@ -12,8 +12,6 @@ import com.jing.ddys.ext.inflate
 import com.jing.ddys.ext.unGzip
 import com.jing.ddys.setting.NetworkProxySettings
 import com.jing.ddys.setting.SettingsViewModel
-import com.whl.quickjs.android.QuickJSLoader
-import com.whl.quickjs.wrapper.QuickJSContext
 import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -28,8 +26,6 @@ import java.net.Proxy
 import java.net.URL
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import javax.crypto.Cipher
@@ -83,7 +79,6 @@ object HttpUtil {
     }
 
     init {
-        QuickJSLoader.init()
         buildOkhttpClientWithProxySetting(
             NetworkProxySettings.loadFromSharedPreference(
                 SettingsViewModel.getSettingSharedPreference()
@@ -262,7 +257,7 @@ object HttpUtil {
                 .byteString()
                 .utf8()
                 .let { js ->
-                    val end = js.indexOf("'.split(';')")
+                    val end = js.indexOf("'.split(',')")
                     var start = -1
                     for (i in (end - 1) downTo 0) {
                         if (js[i] == '\'') {
@@ -273,13 +268,13 @@ object HttpUtil {
                     if (start == -1) {
                         throw RuntimeException("读取main.js失败")
                     }
-                    js.substring((start + 1) until end).split(';').find {
+                    js.substring((start + 1) until end).split(',').find {
                         it.count { ch -> ch == ':' } == 2 && !it.startsWith('/')
                     }
                 }
 
             val param = mapOf(
-                "s" to sParam, "wp" to getParamWp()
+                "s" to sParam, "wp" to encodeParam()
             )
             Request.Builder().url("$BASE_URL/cdn-cgi/challenge-platform/h/g/cv/result/$cacheKey")
                 .post(gson.toJson(param).toRequestBody("application/json".toMediaType())).build()
@@ -344,23 +339,6 @@ object HttpUtil {
     fun buildSSLSocketFactory(): SSLSocketFactory = SSLContext.getInstance("SSL").apply {
         init(null, arrayOf(trustManager), SecureRandom())
     }.socketFactory
-
-
-    private fun getParamWp(): String {
-        val fmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss")
-        val time = fmt.format(Date())
-        val script = DdysApplication.context.assets.open("encrypt.js")
-            .bufferedReader(charset = Charsets.UTF_8).use {
-                it.readText()
-            }
-        return QuickJSContext.create().run {
-            try {
-                evaluate("$script;encodeParam('$time')") as String
-            } finally {
-                destroy()
-            }
-        }
-    }
 
     fun resetOkhttpClientWithProxySettings(proxySettings: NetworkProxySettings) {
         okHttpClient.dispatcher.executorService.shutdown()

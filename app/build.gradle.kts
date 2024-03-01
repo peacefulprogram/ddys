@@ -12,8 +12,8 @@ android {
         applicationId = "com.jing.ddys"
         minSdk = 21
         targetSdk = 33
-        versionCode = 10
-        versionName = "1.2.6"
+        versionCode = 11
+        versionName = "1.2.7"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -113,7 +113,5 @@ dependencies {
     implementation("androidx.media3:media3-ui-leanback:$media3Version")
     implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
 
-
-    implementation("wang.harlon.quickjs:wrapper-android:0.20.2")
 
 }
