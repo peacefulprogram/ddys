@@ -39,8 +39,15 @@ class PlaybackViewModel(
     private val _videoUrl: MutableStateFlow<Resource<VideoUrlWithHistory>> =
         MutableStateFlow(Resource.Loading)
 
+    private val _episodeName =
+        MutableStateFlow(videoDetail.episodes.getOrNull(initEpisodeIndex)?.name ?: "")
+
+    val episodeName: StateFlow<String>
+        get() = _episodeName
+
     private var requestVideoUrlJob: Job? = null
 
+    var resumePosition = 0L
 
     var currentPlayPosition: Long = 0L
 
@@ -57,6 +64,7 @@ class PlaybackViewModel(
     init {
         viewModelScope.launch {
             _videoIndex.collectLatest {
+                _episodeName.emit(videoDetail.episodes.getOrNull(it)?.name ?: "")
                 queryVideoUrl(it)
             }
         }

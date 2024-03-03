@@ -24,8 +24,8 @@ import androidx.leanback.media.PlaybackTransportControlGlue
 import androidx.leanback.media.PlayerAdapter
 import androidx.leanback.widget.Action
 import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.PlaybackControlsRow.FastForwardAction
-import androidx.leanback.widget.PlaybackControlsRow.RewindAction
+import androidx.leanback.widget.PlaybackControlsRow
+import androidx.leanback.widget.PlaybackControlsRow.SkipNextAction
 import com.jing.bilibilitv.playback.GlueActionCallback
 import java.util.concurrent.TimeUnit
 
@@ -60,12 +60,14 @@ class ProgressTransportControlGlue<T : PlayerAdapter>(
 
     private val actionCallbackList = mutableListOf<GlueActionCallback>()
 
-    // Define actions for fast forward and rewind operations.
-    @VisibleForTesting
-    var skipForwardAction: FastForwardAction = FastForwardAction(context)
+    var skipNextAction = SkipNextAction(context)
+
+    var skipForwardAction: PlaybackControlsRow.FastForwardAction =
+        PlaybackControlsRow.FastForwardAction(context)
 
     @VisibleForTesting
-    var skipBackwardAction: RewindAction = RewindAction(context)
+    var skipBackwardAction: PlaybackControlsRow.RewindAction =
+        PlaybackControlsRow.RewindAction(context)
 
     fun setKeyEventInterceptor(interceptor: (KeyEvent) -> Boolean) {
         _keyEventInterceptor = interceptor
@@ -78,11 +80,22 @@ class ProgressTransportControlGlue<T : PlayerAdapter>(
         super.onCreatePrimaryActions(primaryActionsAdapter)
         // Add the rewind and fast forward actions following the play / pause action.
         primaryActionsAdapter.apply {
+            add(1, skipNextAction)
             add(skipBackwardAction)
             add(skipForwardAction)
         }
         onCreatePrimaryAction.invoke(primaryActionsAdapter)
+    }
 
+    fun changeSkipNextVisibility(show: Boolean) {
+        val adapter = controlsRow.primaryActionsAdapter as ArrayObjectAdapter
+        if (show) {
+            if (adapter.indexOf(skipNextAction) == -1) {
+                adapter.add(1, skipNextAction)
+            }
+        } else {
+            adapter.remove(skipNextAction)
+        }
     }
 
     override fun onUpdateProgress() {

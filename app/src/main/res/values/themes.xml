@@ -1,5 +1,11 @@
 <resources>
 
-    <style name="Theme.Ddys" parent="@style/Theme.Leanback" />
+    <style name="Theme.Ddys" parent="@style/Theme.Leanback">
+        <item name="detailsDescriptionTitleStyle">@style/CustomLbDetailsDescriptionTitleStyle</item>
+    </style>
+
+    <style name="CustomLbDetailsDescriptionTitleStyle" parent="Widget.Leanback.DetailsDescriptionTitleStyle">
+        <item name="android:paddingTop">5dp</item>
+    </style>
 
 </resources>

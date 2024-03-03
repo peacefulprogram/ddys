@@ -1,18 +1,23 @@
 package com.jing.ddys.playback
 
+import TrafficSpeedCalculatorBandwidthMeter
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.core.graphics.drawable.toDrawable
 import androidx.leanback.app.ProgressBarManager
 import androidx.leanback.app.VideoSupportFragment
 import androidx.leanback.app.VideoSupportFragmentGlueHost
 import androidx.leanback.widget.Action
+import androidx.leanback.widget.PlaybackControlsRow.SkipNextAction
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -25,10 +30,12 @@ import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.leanback.LeanbackPlayerAdapter
 import com.google.common.net.HttpHeaders
@@ -37,6 +44,7 @@ import com.jing.bilibilitv.playback.PlayListAction
 import com.jing.bilibilitv.playback.ReplayAction
 import com.jing.ddys.BuildConfig
 import com.jing.ddys.R
+import com.jing.ddys.databinding.PlayerProgressBarLayoutBinding
 import com.jing.ddys.ext.secondsToDuration
 import com.jing.ddys.ext.showLongToast
 import com.jing.ddys.ext.showShortToast
@@ -45,8 +53,10 @@ import com.jing.ddys.repository.Resource
 import com.jing.ddys.repository.VideoDetailInfo
 import com.jing.ddys.setting.NetworkProxySettings
 import com.jing.ddys.setting.SettingsViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -79,6 +89,8 @@ class VideoPlaybackFragment : VideoSupportFragment() {
 
     private lateinit var mProgressBarManager: ProgressBarManager
 
+    private lateinit var progressBarBinding: PlayerProgressBarLayoutBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         videoDetail =
@@ -86,6 +98,46 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         playEpIndex = requireActivity().intent.getIntExtra(VideoPlaybackActivity.PLAY_INDEX, 0)
         viewModel = getActivityViewModel { parametersOf(videoDetail, playEpIndex) }
         isControlsOverlayAutoHideEnabled = true
+    }
+
+    private var _updateSpeedJob: Job? = null
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        val root = super.onCreateView(inflater, container, savedInstanceState) as ViewGroup
+        progressBarBinding =
+            PlayerProgressBarLayoutBinding.inflate(inflater)
+        val progressBarRoot = progressBarBinding.root
+        progressBarBinding.speedIndicator.text = "测试"
+        val progressBarParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+        root.addView(progressBarRoot, progressBarParams)
+        progressBarManager.setProgressBarView(progressBarRoot)
+        progressBarRoot.viewTreeObserver.addOnGlobalLayoutListener {
+            if (progressBarRoot.visibility == View.INVISIBLE) {
+                progressBarBinding.speedIndicator.text = ""
+                _updateSpeedJob?.cancel()
+                _updateSpeedJob = null
+            } else {
+                if (_updateSpeedJob == null) {
+                    _updateSpeedJob = viewLifecycleOwner.lifecycleScope.launch {
+                        while (isActive) {
+                            progressBarBinding.speedIndicator.text =
+                                "${trafficSpeedCalculator.getNetworkSpeed()} kb/s"
+                            delay(800L)
+                        }
+                    }
+                }
+            }
+        }
+        return root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -97,8 +149,15 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         view.background = Color.BLACK.toDrawable()
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.episodeName.collectLatest {
+                    glue?.subtitle = it
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.videoIndex.collectLatest {
-                    glue?.subtitle = videoDetail.episodes[it].name
+                    glue?.changeSkipNextVisibility(it < videoDetail.episodes.size - 1)
                 }
             }
         }
@@ -183,7 +242,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
     override fun onPause() {
         super.onPause()
         if (Build.VERSION.SDK_INT <= 23) {
-            resumeFrom = exoplayer!!.currentPosition
+            viewModel.resumePosition = exoplayer!!.currentPosition
             destroyPlayer()
         }
     }
@@ -191,7 +250,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
     override fun onStop() {
         super.onStop()
         if (Build.VERSION.SDK_INT > 23) {
-            resumeFrom = exoplayer!!.currentPosition
+            viewModel.resumePosition = exoplayer!!.currentPosition
             destroyPlayer();
         }
     }
@@ -238,40 +297,58 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         DefaultMediaSourceFactory(dataSourceFactory)
     }
 
+    private val trafficSpeedCalculator by lazy {
+        TrafficSpeedCalculatorBandwidthMeter(
+            DefaultBandwidthMeter.getSingletonInstance(
+                requireContext()
+            )
+        )
+    }
+
+
     private fun buildPlayer() {
-
-        exoplayer = ExoPlayer.Builder(requireContext()).build().apply {
-            trackSelectionParameters = trackSelectionParameters.buildUpon()
-                .setPreferredTextLanguage("zh")
-                .build()
-            prepareGlue(this)
-            playWhenReady = true
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == ExoPlayer.STATE_ENDED) {
-                        viewModel.playNextEpisodeIfExists()
+        exoplayer = ExoPlayer.Builder(requireContext())
+            .setBandwidthMeter(trafficSpeedCalculator)
+            .setLoadControl(
+                DefaultLoadControl.Builder().setBufferDurationsMs(
+                    20_000,
+                    50_000,
+                    1000,
+                    1000
+                ).build()
+            )
+            .build().apply {
+                trackSelectionParameters = trackSelectionParameters.buildUpon()
+                    .setPreferredTextLanguage("zh")
+                    .build()
+                prepareGlue(this)
+                playWhenReady = true
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == ExoPlayer.STATE_ENDED) {
+                            viewModel.playNextEpisodeIfExists()
+                        }
                     }
-                }
 
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying) {
-                        viewModel.startSaveHistory()
-                    } else {
-                        viewModel.saveHistory()
-                        viewModel.stopSaveHistory()
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        if (isPlaying) {
+                            viewModel.startSaveHistory()
+                        } else {
+                            viewModel.saveHistory()
+                            viewModel.stopSaveHistory()
+                        }
                     }
-                }
 
-                override fun onPlayerError(error: PlaybackException) {
-                    this@VideoPlaybackFragment.requireContext()
-                        .showLongToast("播放失败:${error.cause?.message ?: error.message}")
-                }
+                    override fun onPlayerError(error: PlaybackException) {
+                        this@VideoPlaybackFragment.requireContext()
+                            .showLongToast("播放失败:${error.cause?.message ?: error.message}")
+                    }
 
-                override fun onCues(cueGroup: CueGroup) {
-                    mSubtitleView.setCues(cueGroup.cues)
-                }
-            })
-        }
+                    override fun onCues(cueGroup: CueGroup) {
+                        mSubtitleView.setCues(cueGroup.cues)
+                    }
+                })
+            }
 
     }
 
@@ -300,12 +377,27 @@ class VideoPlaybackFragment : VideoSupportFragment() {
             }).apply {
             host = VideoSupportFragmentGlueHost(this@VideoPlaybackFragment)
             title = videoDetail.title
+            subtitle = viewModel.episodeName.value
             // Enable seek manually since PlaybackTransportControlGlue.getSeekProvider() is null,
             // so that PlayerAdapter.seekTo(long) will be called during user seeking.
             isSeekEnabled = true
             isControlsOverlayAutoHideEnabled = true
             addActionCallback(replayActionCallback)
             addActionCallback(changePlayVideoActionCallback)
+            addActionCallback(object : GlueActionCallback {
+                override fun support(action: Action): Boolean {
+                    return action is SkipNextAction
+                }
+
+                override fun onAction(action: Action) {
+                    val current = viewModel.videoIndex.value
+                    if (current in 0 until videoDetail.episodes.size) {
+                        exoplayer?.pause()
+                        viewModel.changePlayVideoIndex(current + 1)
+                    }
+                }
+            })
+            changeSkipNextVisibility(viewModel.videoIndex.value < videoDetail.episodes.size - 1)
             setKeyEventInterceptor { onKeyEvent(it) }
         }
     }
@@ -373,6 +465,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         ChooseEpisodeDialog(dataList = videoDetail.episodes,
             defaultSelectIndex = viewModel.videoIndex.value,
             getText = { _, item -> item.name }) { index, _ ->
+            exoplayer?.pause()
             viewModel.changePlayVideoIndex(index)
         }.apply {
             showNow(fragmentManager, "")
