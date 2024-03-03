@@ -81,8 +81,6 @@ class VideoPlaybackFragment : VideoSupportFragment() {
 
     private var glue: ProgressTransportControlGlue<LeanbackPlayerAdapter>? = null
 
-    private var resumeFrom = -1L
-
     private var backPressed = false
 
     private lateinit var mSubtitleView: SubtitleView
@@ -111,7 +109,6 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         progressBarBinding =
             PlayerProgressBarLayoutBinding.inflate(inflater)
         val progressBarRoot = progressBarBinding.root
-        progressBarBinding.speedIndicator.text = "测试"
         val progressBarParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
@@ -120,23 +117,6 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         }
         root.addView(progressBarRoot, progressBarParams)
         progressBarManager.setProgressBarView(progressBarRoot)
-        progressBarRoot.viewTreeObserver.addOnGlobalLayoutListener {
-            if (progressBarRoot.visibility == View.INVISIBLE) {
-                progressBarBinding.speedIndicator.text = ""
-                _updateSpeedJob?.cancel()
-                _updateSpeedJob = null
-            } else {
-                if (_updateSpeedJob == null) {
-                    _updateSpeedJob = viewLifecycleOwner.lifecycleScope.launch {
-                        while (isActive) {
-                            progressBarBinding.speedIndicator.text =
-                                "${trafficSpeedCalculator.getNetworkSpeed()} kb/s"
-                            delay(800L)
-                        }
-                    }
-                }
-            }
-        }
         return root
     }
 
@@ -196,9 +176,9 @@ class VideoPlaybackFragment : VideoSupportFragment() {
                                     exoplayer!!.setMediaSource(videoMediaSource)
                                 }
                                 prepare()
-                                if (resumeFrom > 0) {
-                                    seekTo(resumeFrom)
-                                    resumeFrom = -1
+                                if (viewModel.resumePosition > 0) {
+                                    seekTo(viewModel.resumePosition)
+                                    viewModel.resumePosition = 0
                                 } else if (history.lastPlayPosition > 0) {
                                     // 距离结束小于10秒,当作播放结束
                                     if (history.videoDuration > 0 && history.videoDuration - history.lastPlayPosition < 10_000) {
@@ -232,10 +212,31 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         }
     }
 
+    private fun listenProgressBarVisibility() {
+        progressBarBinding.root.setVisibilityListener { visibility ->
+            if (visibility != View.VISIBLE) {
+                progressBarBinding.speedIndicator.text = ""
+                _updateSpeedJob?.cancel()
+                _updateSpeedJob = null
+            } else {
+                if (_updateSpeedJob == null) {
+                    _updateSpeedJob = viewLifecycleOwner.lifecycleScope.launch {
+                        while (isActive) {
+                            progressBarBinding.speedIndicator.text =
+                                "${trafficSpeedCalculator.getNetworkSpeed()} kb/s"
+                            delay(800L)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         if (Build.VERSION.SDK_INT > 23) {
             buildPlayer()
+            listenProgressBarVisibility()
         }
     }
 
@@ -244,6 +245,9 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         if (Build.VERSION.SDK_INT <= 23) {
             viewModel.resumePosition = exoplayer!!.currentPosition
             destroyPlayer()
+            _updateSpeedJob?.cancel()
+            _updateSpeedJob = null
+            progressBarBinding.root.removeVisibilityListener()
         }
     }
 
@@ -251,7 +255,10 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         super.onStop()
         if (Build.VERSION.SDK_INT > 23) {
             viewModel.resumePosition = exoplayer!!.currentPosition
-            destroyPlayer();
+            destroyPlayer()
+            _updateSpeedJob?.cancel()
+            _updateSpeedJob = null
+            progressBarBinding.root.removeVisibilityListener()
         }
     }
 
@@ -305,6 +312,32 @@ class VideoPlaybackFragment : VideoSupportFragment() {
         )
     }
 
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == ExoPlayer.STATE_ENDED) {
+                viewModel.playNextEpisodeIfExists()
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                viewModel.startSaveHistory()
+            } else {
+                viewModel.saveHistory()
+                viewModel.stopSaveHistory()
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            this@VideoPlaybackFragment.requireContext()
+                .showLongToast("播放失败:${error.cause?.message ?: error.message}")
+        }
+
+        override fun onCues(cueGroup: CueGroup) {
+            mSubtitleView.setCues(cueGroup.cues)
+        }
+    }
+
 
     private fun buildPlayer() {
         exoplayer = ExoPlayer.Builder(requireContext())
@@ -323,31 +356,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
                     .build()
                 prepareGlue(this)
                 playWhenReady = true
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == ExoPlayer.STATE_ENDED) {
-                            viewModel.playNextEpisodeIfExists()
-                        }
-                    }
-
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        if (isPlaying) {
-                            viewModel.startSaveHistory()
-                        } else {
-                            viewModel.saveHistory()
-                            viewModel.stopSaveHistory()
-                        }
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        this@VideoPlaybackFragment.requireContext()
-                            .showLongToast("播放失败:${error.cause?.message ?: error.message}")
-                    }
-
-                    override fun onCues(cueGroup: CueGroup) {
-                        mSubtitleView.setCues(cueGroup.cues)
-                    }
-                })
+                addListener(playerListener)
             }
 
     }
@@ -355,6 +364,7 @@ class VideoPlaybackFragment : VideoSupportFragment() {
 
     private fun destroyPlayer() {
         exoplayer?.let {
+            it.removeListener(playerListener)
             // Pause the player to notify listeners before it is released.
             it.pause()
             it.release()
