@@ -88,7 +88,7 @@ class PlaybackViewModel(
                         ""
                     }
                 }
-                var url = if (ep.src1.isNotEmpty()) {
+                var url = if (ep.src0.isEmpty()) {
                     HttpUtil.queryVideoUrl(ep.src1, videoDetail.detailPageUrl)
                 } else {
                     VideoUrl(
